@@ -179,10 +179,13 @@ for (const x of [1.64, -1.64]) {
 }
 ok(mag.length === 0 && breeding.slots.slice(0,2).every(Boolean), 'G 将弹夹首项分别投入第一座舱的两槽');
 ok(chamberSystem.status().phase === 'sealing', '第二只投入后自动密封');
-ok(!!breeding.pairs[0].genome, '开始时就固定后代基因');
+ok(!!breeding.pairs[0].genome, '开始时准备本轮基因候选');
 const planned = breeding.pairs[0].genome.slice();
-breedAdvance(1);
 for (let i = 0; i < 30; i++) chamberSystem.tick(.05);
+ok(chamberSystem.status().phase==='irradiating','密封后进入辐射阶段');
+fire('chamber-interact','click');
+breedAdvance(1);
+chamberSystem.tick(.05);
 ok(chamberSystem.status().phase === 'ready' && chamberSystem.status().view.closed
   && chamberSystem.status().view.observationWindow, 'ready 时观察窗舱门仍保持关闭');
 ok(el('chamber-interact').disabled === false, 'HUD 开始按钮可用');

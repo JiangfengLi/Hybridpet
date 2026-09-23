@@ -33,6 +33,7 @@ import * as THREE from '../vendor/three.module.min.js';
 import { GLTFLoader } from '../vendor/GLTFLoader.js';
 import { createChamberSystem, CHAMBER_POSITIONS } from '../chamber-system.mjs';
 import {createWaterGun} from '../water-gun.mjs';
+import {BASE_MUTATION_RATE,normalizedRadiation,createInheritancePlan,resolveInheritancePlan} from '../mutation-rate.mjs';
 import {createBonePhysics} from '../bone-physics.mjs';
 import {createTripoClient, cloneOffspring, disposeModel} from '../tripo-runtime.mjs';
 

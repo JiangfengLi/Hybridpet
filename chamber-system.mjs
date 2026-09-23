@@ -17,7 +17,11 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
   let phase='loading',task=0,sealing=0,child=null,prepared=null,preparedId=0,lastHud='';
   let lastParents=[null,null],time=0,notice='';
   const water=createWaterCharge({thresholds:waterThresholds,
-    onChange:event=>emitWater('change',{...event,chamberId:id,taskId:task}),
+    onChange:event=>{
+      if(event.reason==='spray')host.setRadiation?.(event.value);
+      emitWater('change',{...event,chamberId:id,taskId:task});
+      if(event.reason==='spray'&&event.value>=1&&phase==='irradiating')confirmRadiation();
+    },
     onThreshold:event=>emitWater('threshold',{...event,chamberId:id,taskId:task})});
   const distance=()=>Math.hypot(player.x-position.x,player.z-position.z);
   const performanceKey=()=>id+':'+task;
@@ -50,6 +54,17 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
   }
   function clearPrepared() {
     prepared?.userData.dispose?.();prepared=null;preparedId=0;
+  }
+  function mutationStatus() {
+    return phase==='complete'&&child
+      ?{rate:child.mutationRate??.05,locked:true}
+      :host.mutation?.()??{rate:.05,locked:false};
+  }
+  function confirmRadiation() {
+    if(phase!=='irradiating'||!host.active())return false;
+    if(!host.confirmRadiation?.(water.status().value))return false;
+    host.stopRadiation?.();
+    phase='generating';notice='';return true;
   }
   function startJob() {
     if(phase!=='loading'||host.parents().some(p=>!p))return false;
@@ -111,6 +126,7 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
   function interact() {
     if(!host.active()||distance()>10)return false;
     if(phase==='complete'){collect();return true;}
+    if(phase==='irradiating')return confirmRadiation();
     if(phase==='error'){host.retryGeneration();phase='generating';notice='';return true;}
     if(phase==='loading') {
       if(!startJob())note('等待两只亲代');
@@ -138,8 +154,11 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
     syncParents();
     if(running&&phase==='sealing') {
       sealing+=dt;
-      if(sealing>=1.4)phase=host.job().state==='ready'?'ready':'generating';
+      if(sealing>=1.4)phase=host.job().state==='irradiating'?'irradiating':
+        host.job().state==='ready'?'ready':'generating';
     }
+    if(phase==='irradiating'&&water.status().value>=1)confirmRadiation();
+    if(phase==='irradiating'&&host.job().state==='running')phase='generating';
     if(phase==='generating'&&host.job().state==='ready')phase='ready';
     const generation=host.generation?.();
     if(['sealing','generating'].includes(phase)&&generation?.status==='error')phase='error';
@@ -170,16 +189,17 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
     if(force)lastHud='';
     const generation=host.generation?.();
     const progress=host.progress(),equipped=!!host.waterEquipped?.();
+    const mutation=mutationStatus(),canConfirm=phase==='irradiating'&&distance()<10&&player.y<6;
     const aimed=view.aim(player),parents=host.parents();
-    const canEquip=['sealing','generating'].includes(phase)&&distance()<10&&player.y<6&&!equipped;
+    const canEquip=['sealing','irradiating'].includes(phase)&&distance()<10&&player.y<6&&!equipped;
     const canStow=equipped&&host.canStowWater?.();
     const state=JSON.stringify([phase,parents.map(p=>p?.species.name),host.loadedName(),aimed,progress,
-      notice,child?.species.name,generation?.error,equipped,canEquip,canStow]);
+      notice,child?.species.name,generation?.error,equipped,canEquip,canStow,mutation]);
     if(state!==lastHud) {
       lastHud=state;hud.dataset.phase=phase;
       hud.dataset.chamber=String(id);
       $('chamber-name').textContent='GENESIS / '+String(id+1).padStart(2,'0');
-      $('chamber-phase').textContent=({loading:'等待亲代',sealing:'舱门密封',generating:'孕育中',error:'孕育暂时中断',ready:'可以结合',playing:'结合中',complete:'新生命诞生'})[phase];
+      $('chamber-phase').textContent=({loading:'等待亲代',sealing:'舱门密封',irradiating:'爱心辐射',generating:'孕育中',error:'孕育暂时中断',ready:'可以结合',playing:'结合中',complete:'新生命诞生'})[phase];
       $('chamber-left').textContent=parents[0]?.species.name||'左槽 · 空';
       $('chamber-right').textContent=parents[1]?.species.name||'右槽 · 空';
       $('chamber-left').classList.toggle('aimed',aimed===0);
@@ -188,18 +208,22 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
       const modelStatus=progress.offline?'离线演示':({submitting:'提交中',queued:'排队中',running:'模型生成',
         downloading:'模型下载中',loading:'模型载入中',ready:'模型已就绪',error:'生成中断'})[progress.stage]||'模型生成';
       $('chamber-countdown').textContent=phase==='error'?generation?.error||'模型生成中断':
+        phase==='irradiating'?'等待确认生成':
         ['sealing','generating','ready'].includes(phase)?modelStatus+' · '+Math.floor(progress.percent)+'%':
         phase==='complete'?child?.species.name||'':progress.offline?'离线演示':'';
+      $('chamber-mutation').textContent='突变概率 · '+(mutation.rate*100).toFixed(1)+'%'+
+        (mutation.locked?' · 已锁定':'');
       $('chamber-fire').disabled=equipped||phase!=='loading'||![0,1].includes(aimed)||!!parents[aimed]||!host.loadedName();
       $('chamber-suck').textContent=phase==='error'?'结束本次孕育':'吸回';
       $('chamber-suck').disabled=equipped||phase!=='error'&&phase!=='complete'&&(phase!=='loading'||![0,1].includes(aimed)||!parents[aimed]);
-      $('chamber-interact').disabled=!canEquip&&!canStow&&!['ready','complete','error'].includes(phase)&&!(phase==='loading'&&parents.every(Boolean));
-      $('chamber-interact').textContent=canStow?'收起爱心辐射枪 · E':canEquip?'领取爱心辐射枪 · E':phase==='error'?'继续查询 / 加载':
+      $('chamber-interact').disabled=!canConfirm&&!canEquip&&!canStow&&!['ready','complete','error'].includes(phase)&&!(phase==='loading'&&parents.every(Boolean));
+      $('chamber-interact').textContent=phase==='irradiating'?'确认生成':canStow?'收起爱心辐射枪 · E':canEquip?'领取爱心辐射枪 · E':phase==='error'?'继续查询 / 加载':
         phase==='complete'?'收下后代':phase==='loading'?'再次孕育':
-        ['sealing','generating'].includes(phase)?'爱心辐射枪已装备':'开始结合';
+        phase==='sealing'?'舱门密封中':phase==='generating'?'模型生成中':'开始结合';
     }
   }
-  return {id,position,fire,suck,interact,cancel,tick,collect,syncAudio,renderHud,
+  return {id,position,fire,suck,interact,cancel,tick,collect,syncAudio,renderHud,confirmRadiation,
+    get canConfirm(){return phase==='irradiating'&&distance()<10&&player.y<6;},
     get cinematic(){return phase==='playing';},
     get presentationPaused(){return phase==='playing'&&performanceView.paused;},
     get near(){return distance()<10;},
@@ -207,14 +231,15 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
     get aimDistance(){return view.hit(player)?.distance??Infinity;},
     get distance(){return distance();},
     get ready(){return phase==='ready';},
-    get offersWater(){return ['sealing','generating'].includes(phase)&&distance()<10&&player.y<6;},
+    get offersWater(){return ['sealing','irradiating'].includes(phase)&&distance()<10&&player.y<6;},
     get hudVisible(){return host.visible()&&distance()<=11&&phase!=='playing';},
     get child(){return child;},
     boost(repeat){if(phase==='playing')performanceView.boost(repeat);},
     constrain(body,radius){view.constrain(body,radius);},
     waterHit(origin,direction,range){return view.waterHit(origin,direction,range);},
     addWater(seconds) {
-      if(!host.active()||!['sealing','generating'].includes(phase)||!view.status().incubating)return false;
+      if(!host.active()||!['sealing','irradiating'].includes(phase)||!view.status().incubating||
+        host.job().state!=='irradiating')return false;
       return water.add(Math.min(.1,seconds));
     },
     status(){
@@ -222,7 +247,7 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
       return {id,number:id+1,position,phase,task,
       slots:host.parents().map(p=>p?.species.name||null),child:child?.species.name||null,
       progress:host.progress(),remaining:host.offline?.()?host.remaining():null,
-      water:water.status(),view:view.status(),
+      water:water.status(),mutation:mutationStatus(),view:view.status(),
       generation:generation?{status:generation.status,progress:generation.progress,error:generation.error,taskId:generation.task_id}:null,
       performance:performanceView.preparedTask===performanceKey()?performanceView.status():{
         active:false,state:'setup',presses:0,surgeRound:0,time:0,cinematicTime:0,
@@ -275,11 +300,16 @@ export function createChamberSystem({THREE,scene,camera,player,host,waterThresho
     if(cinematic())return null;
     return pods.filter(pod=>pod.offersWater).sort((a,b)=>a.distance-b.distance)[0]||null;
   }
+  function radiationPod(){
+    const aimed=focused(true);
+    return aimed?.offersWater?aimed:waterNearby();
+  }
   function interact(){
     if(!hosts[0].active())return false;
-    const nearby=waterNearby();
+    const nearby=radiationPod();
     if(hosts[0].waterEquipped?.()&&!nearby){hosts[0].stowWater?.();return true;}
     if(!hosts[0].waterEquipped?.()&&nearby){hosts[0].equipWater?.();return true;}
+    if(hosts[0].waterEquipped?.()&&nearby?.canConfirm)return nearby.confirmRadiation();
     return focused()?.interact()??false;
   }
   function traceWater(origin,direction,range=12) {
@@ -294,9 +324,12 @@ export function createChamberSystem({THREE,scene,camera,player,host,waterThresho
     pods.forEach(pod=>pod.syncAudio());
     performanceView.syncAudio(hosts[owner].running()&&!document.hidden);
   }
-  const bindings=[['chamber-fire',fire],['chamber-suck',()=>focused()?.suck()??false],['chamber-interact',interact]];
+  const bindings=[['chamber-fire',fire],['chamber-suck',()=>focused()?.suck()??false],
+    ['chamber-interact',()=>{const pod=focused();return pod?.canConfirm?pod.confirmRadiation():interact();}]];
   bindings.forEach(([id,handler])=>document.getElementById(id).addEventListener('click',handler));
   return {fire,suck,interact,syncAudio,
+    confirmRadiation(){const pod=radiationPod();return pod?.canConfirm?pod.confirmRadiation():false;},
+    get canConfirmRadiation(){return radiationPod()?.canConfirm??false;},
     get cinematic(){return cinematic();},
     get presentationPaused(){return cinematic()&&performanceView.paused;},
     get near(){return !!hosts[0].waterEquipped?.()||!!waterNearby()||(focused()?.near??false);},

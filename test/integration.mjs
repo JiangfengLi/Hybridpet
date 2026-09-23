@@ -1641,9 +1641,8 @@ sec('12c. 屠宰块（背包 → 尸体）');
    ------------------------------------------------------------
    这一节守的是"规则被实现成了规则本身"，而不是"页面看起来像那么回事"：
      · 每位 50% 继承（**逐位**二选一）
-     · 每位 5% 突变，**整表随机**，且突变后一定与原值不同
-     · 突变提示只说**位点名**（用户给的格式：眼睛的有无发生了突变！！！）
-     · 基因在**交配时**算定且**不暴露**，接生时才给结果
+     · 每位基础 5% 突变，辐射可提升至 25%，整表随机且一定改变原值
+     · 突变提示只说位点名，基因和提示词不提前暴露
      · 离线演示计时暂停不走；HTTP 以真实模型就绪为准，接生后亲代留槽位
      · 占位球把基因里能程序化表达的部分真的表出来（尺寸/颜色/质感/发光）
    ============================================================ */
@@ -1916,9 +1915,13 @@ ok(BREED_MS_DEFAULT === 15000, '离线演示默认15秒，HTTP不使用本地倒
   ok(pairCanMate(0) === true, '0 号对两只就位 ⇒ 可以交配');
   ok(startMate(0) === true, '点交配返回成功');
   const pr = breeding.pairs[0];
+  ok(pr.state==='irradiating'&&!pr.genesLocked,'先进入辐射调节阶段');
+  breedAdvance(BREED_MS);
+  ok(pr.state==='irradiating'&&pr.ms===0,'未确认时不会用离线时间跳过辐射');
+  ok(confirmMateRadiation(0),'确认本轮基础突变率');
   ok(pr.state === 'running', '进入倒计时');
-  ok(!!pr.genome && pr.genome.length === GENE_COUNT, '基因在**交配时**就算定了（用户要求）');
-  ok(pr.prompt.length > 20, '提示词也在交配时算好了');
+  ok(!!pr.genome && pr.genome.length === GENE_COUNT&&pr.genesLocked, '确认后基因定稿');
+  ok(pr.prompt.length > 20, '模型使用最终基因的提示词');
 
   setBagPage(1);
   const h = el('bagPage0').innerHTML;
@@ -1972,6 +1975,7 @@ ok(BREED_MS_DEFAULT === 15000, '离线演示默认15秒，HTTP不使用本地倒
   try {
     BREED_MS = 40; paused = false; debugStill = false; breedClockLast = -1;
     ok(startMate(0), '同一舱可以再次繁衍');
+    ok(confirmMateRadiation(0), '新一轮确认后才开始离线生成计时');
     loop(); now += 39; loop();
     ok(breeding.pairs[0].state === 'running', '真实毫秒未到阈值时仍等待');
     paused = true; now += 120000;

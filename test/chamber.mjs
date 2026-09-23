@@ -73,6 +73,7 @@ ok(chamberSystem.status().view.incubationTime>incubationBefore+3.9,
 ok(podLoop.rotation.y===0&&podLoop.children.every((actor,i)=>actor.rotation.y===actorRotations[i]),
   'window actors keep their facing with no spinning');
 ok(JSON.stringify(breeding.pairs[0].genome)===planned, 'window loop does not reroll offspring');
+ok(chamberSystem.confirmRadiation(),'confirm zero radiation at the base mutation rate');
 breedAdvance(BREED_MS);
 step(90);
 ok(chamberSystem.status().phase==='ready'&&chamberSystem.status().view.closed

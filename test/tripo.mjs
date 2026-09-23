@@ -38,6 +38,9 @@ tripoClient.generate=(job,box,progress,resume)=>new Promise((resolve,reject)=>ca
 const parents=['slime-ring','slime-ball'].map(key=>animals.find(a=>a.species.key===key));
 breeding.slots[0]=parents[0];breeding.slots[1]=parents[1];
 ok(startMate(0),'online breeding starts');
+ok(calls.length===0&&breeding.pairs[0].state==='irradiating',
+  'starting a pair does not submit a paid generation before confirmation');
+ok(confirmMateRadiation(0),'confirm base mutation rate before submitting');
 const pr=breeding.pairs[0],genome=JSON.stringify(pr.genome),id=pr.generation.id;
 breedAdvance(BREED_MS+1);
 ok(pr.state==='running'&&!birthOffspring(0,'chamber'),'timer alone cannot birth a placeholder');
@@ -58,7 +61,7 @@ ok(baby?.modelTaskId==='remote-123'&&baby.species.key==='offspring-remote-123','
 ok(JSON.stringify(baby.genome)===genome,'birth preserves exact genome');
 ok(!birthOffspring(0,'chamber'),'no duplicate child');
 breeding.slots[0]=baby;
-ok(startMate(0)&&pr.generation.id!==id,'generated child can breed a new request');
+ok(startMate(0)&&confirmMateRadiation(0)&&pr.generation.id!==id,'generated child can breed a new request');
 const oldJob=pr.generation;
 abortOffspringGeneration(pr);
 calls[2].resolve({model:buildOffspringBody(oldJob.genome),taskId:'stale'});await tick();
@@ -86,6 +89,7 @@ parents.forEach(captureAnimal);
 for(let id=0;id<3;id++) {
   at(id,0);chamberSystem.fire();
   at(id,1);chamberSystem.fire();
+  step(90);chamberSystem.confirmRadiation();
 }
 ok(calls.length===3&&new Set(calls.map(call=>call.job.id)).size===3,
   'each pod submits one unique generation request');
@@ -116,6 +120,7 @@ ok(chamberSystem.status(1).phase==='loading'&&!breeding.pairs[1].generation,
 ok(chamberSystem.status(0).phase==='ready'&&chamberSystem.status(2).phase==='ready',
   'ending one attempt preserves other ready models');
 at(1);chamberSystem.interact();
+step(90);chamberSystem.confirmRadiation();
 ok(calls.length===5&&calls[4].job.id!==originalId,'next attempt gets a new request ID');
 plans[1]=JSON.stringify(breeding.pairs[1].genome);
 resolveModel(calls[4],1);await tick();breedAdvance(BREED_MS);step(120);
