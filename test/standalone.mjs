@@ -11,6 +11,15 @@ const grab=id=>{
   return found[1];
 };
 const entries=JSON.parse(grab('__chamber_modules'));
+const models=JSON.parse(grab('__propmodels'));
+for(const filename of fs.readdirSync(path.join(root,'models')).filter(name=>name.endsWith('.glb'))) {
+  const key=filename.slice(0,-4);
+  assert.deepEqual(Buffer.from(models[key]||'','base64'),fs.readFileSync(path.join(root,'models',filename)),
+    key+' embedded model matches the imported asset');
+}
+for(const key of ['knife-shiba','kangaroo-peek','bull-aloof','baby-laugh','sunny-sun','mind-sphere']) {
+  assert.ok(models[key],key+' available offline');
+}
 const available=new Set(['vendor/three.module.min.js']);
 assert.equal(entries.length,21);
 for(const {name,source,dependencies} of entries) {

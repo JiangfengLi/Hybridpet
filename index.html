@@ -1487,6 +1487,9 @@ const slimeStats = { models: 0, instances: 0, triangles: 0, failed: [], ms: 0, s
 globalThis.__campStats  = campStats;
 globalThis.__slimeStats = slimeStats;
 
+/* AssetPack environment replacements retain these runtime names and placements.
+   Source filenames and hashes: docs/asset-guide/import-map.json.
+   tree-01 remains original by request; grass-03 and stone-01/02/03 have no replacements. */
 /* name          n   缩放区间        占地半径 同类间距 离出生点 半边长         倾斜   成簇[k起,k止,r起,r止] 投影 */
 const PROP_DEFS = [
   { name: 'tree-01',  n: 16, s: [6.5, 11.0], radius: 5.0, minGap: 22, spawnClear: 16, half: ARENA - 12,     tilt: 0.04, clump: null,                 shadow: true  },
@@ -1815,6 +1818,8 @@ function campToWorld(cx, cz, th, x, z) {
 
 async function buildCamp() {
   if (!GLTFLoader) return;
+  // Placement needs the imported vegetation's measured footprints, not an empty pending list.
+  await propsReady;
   const t0 = Date.now();
   const rnd = mulberry32(SEED + 707);
   const avoid = [
@@ -2388,6 +2393,21 @@ const SPECIES_LIST = [
            否则 40 只史莱姆的落点会整体前移一位、整张地图重排。 */
   { key: 'slime-ring', name: '浮环史莱姆', count: 20, glb: 'slime-ring', body: 'A', speed: 0.52 },
   { key: 'slime-ball', name: '粘球史莱姆', count: 20, glb: 'slime-ball', body: 'A', speed: 0.72 },
+  /* Append after the slimes to preserve their seeded spawn positions.
+     Seeds use the pack's first 32 slots; the existing accessory slots follow. */
+  { key: 'knife-shiba', name: '持刀盾柴犬球', count: 3, glb: 'knife-shiba', body: 'A', speed: 0.62,
+    genomeSeed: [0,0,1,6,0, 0,1,0, 0,1,0, 1,1,0, 1,1,0, 0,1,0, 1,1,0, 0,1,0, 1,1,0, 1,1,0],
+    accessories: [0, 1] },
+  { key: 'kangaroo-peek', name: '偷偷看袋鼠', count: 3, glb: 'kangaroo-peek', body: 'A', speed: 0.72,
+    genomeSeed: [0,0,1,6,2, 0,1,3, 0,1,0, 1,1,0, 1,1,0, 0,1,0, 1,1,0, 0,1,0, 1,1,0, 1,1,0] },
+  { key: 'bull-aloof', name: '冷淡牛', count: 3, glb: 'bull-aloof', body: 'A', speed: 0.52,
+    genomeSeed: [0,0,1,6,2, 0,1,0, 0,1,0, 0,1,1, 1,1,0, 0,1,0, 1,1,0, 0,1,1, 1,1,0, 1,1,0] },
+  { key: 'baby-laugh', name: '捧腹大笑奶娃', count: 3, glb: 'baby-laugh', body: 'A', speed: 0.52,
+    genomeSeed: [0,0,1,0,2, 0,1,3, 0,1,0, 1,1,0, 1,1,0, 1,1,0, 1,1,0, 0,1,0, 1,1,0, 1,1,0] },
+  { key: 'sunny-sun', name: '太阳 Sunny', count: 3, glb: 'sunny-sun', body: 'A', speed: 0.62,
+    genomeSeed: [0,0,1,3,0, 0,1,3, 1,1,0, 1,1,0, 1,1,0, 1,1,0, 1,1,0, 1,1,0, 1,1,0, 0,1,1] },
+  { key: 'mind-sphere', name: '心灵探测球', count: 3, glb: 'mind-sphere', body: 'A', speed: 0.62,
+    genomeSeed: [0,0,5,0,0, 0,5,0, 1,5,0, 1,5,0, 1,5,0, 1,5,0, 1,5,0, 1,5,0, 1,5,0, 1,5,0] },
 ];
 /* 原来这里有 `const speciesSeen = Object.create(null);` —— **物种图鉴**的记账表。
    2026-09-23 连同"按 E 观测物种 / HUD 已观测 n/7 / 背包帕鲁页的图鉴区块 /
@@ -2458,7 +2478,7 @@ for (const sp of SPECIES_LIST) {
   }
 }
 
-/* ---------- 史莱姆：导入的 GLB 角色（场上**只有**这两种生物） ----------
+/* ---------- 导入的 GLB 角色（两种史莱姆 + 六种 AssetPack 生物） ----------
    与上面 5 个的关键区别是**异步**：GLB 要先解析。所以这一段独立成函数，
    用独立的随机流（SEED+808），碰不到 rndAnimal —— 所以"关掉程序化物种"
    这件事不会影响史莱姆的落点，世界布局仍然可复现。
@@ -2481,7 +2501,7 @@ async function buildSlimes() {
     } catch (e) {
       const msg = sp.glb + ': ' + String((e && e.message) || e);
       slimeStats.failed.push(msg);
-      console.warn('[alien-walk] 史莱姆模型加载失败，跳过 —— ' + msg);
+      console.warn('[alien-walk] 生物模型加载失败，跳过 —— ' + msg);
       continue;
     }
     slimeStats.models++;
@@ -2536,7 +2556,7 @@ async function buildSlimes() {
     slimeStats.species.push(sp.key + ' ×' + placed);
   }
   slimeStats.ms = Date.now() - t0;
-  console.log('[alien-walk] 史莱姆：' + slimeStats.models + ' 种 / ' + slimeStats.instances +
+  console.log('[alien-walk] 导入生物：' + slimeStats.models + ' 种 / ' + slimeStats.instances +
               ' 只（' + slimeStats.species.join('、') + '），' + slimeStats.ms + ' ms');
   {
     const b = BODY_BOX.A;
@@ -4205,6 +4225,15 @@ function attachListOf(g) {
    基因是写提示词用的，写成"有"会真的生成出眼睛来。 */
 const FORM_SPHERE = 0, ON_NO = 1, TEX_JELLY = 3, COLOR_WHITE = 12, COLOR_LIGHTBLUE = 7;
 function initialGenomeFor(sp) {
+  if (sp.genomeSeed) {
+    const g = new Array(GENE_COUNT).fill(0);
+    sp.genomeSeed.forEach((value, i) => { g[i] = value; });
+    g[G_BODY] = Math.max(0, BODY_GRADES.indexOf(sp.body || 'A'));
+    const accessories = sp.accessories || [];
+    g[G_ATTACH_N] = accessories.length;
+    accessories.forEach((value, i) => { g[G_ATTACH1 + i] = value; });
+    return g;
+  }
   const g = new Array(GENE_COUNT).fill(0);
   for (let i = 0; i < GENE_COUNT; i++) {
     if (GENE_DEFS[i].opts === ON_OFF) g[i] = ON_NO;

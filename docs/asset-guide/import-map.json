@@ -1,0 +1,162 @@
+[
+  {
+    "source": "environment/environment.json",
+    "target": "docs/asset-guide/environment.json",
+    "sha256": "db04bdeb1bc6bce12223e24546ecd903e5c4c9d2517815f9ed1be5cdb50bb760"
+  },
+  {
+    "source": "environment/e05_grass_mid.glb",
+    "target": "models/grass-01.glb",
+    "sha256": "d546a081c168449bf36a1cd0d3a702878708b2cf151206fd1d6232fbefdee85d"
+  },
+  {
+    "source": "environment/e06_grass_tall.glb",
+    "target": "models/grass-02.glb",
+    "sha256": "22186f5f0dcfd38de6420270562cc083d70fc0667c3c21b6b96fc4ab2786c990"
+  },
+  {
+    "source": "environment/p01_shrub_small.glb",
+    "target": "models/bush-01.glb",
+    "sha256": "b9112ea08dcfad82d49d0d3ef44326df2cf4757e0f1c2454de75efcfd8881ba1"
+  },
+  {
+    "source": "environment/p02_shrub_large.glb",
+    "target": "models/bush-02.glb",
+    "sha256": "816ca049635d337a58fcfe10b232aa323ab30305452d911f2923541168c7910b"
+  },
+  {
+    "source": "environment/p03_tree_small.glb",
+    "target": "models/environment-p03_tree_small.glb",
+    "sha256": "9d2bac37f501c6c63d0dcf0de831b19faa8c4a3383a092196463a17ce21f2e99"
+  },
+  {
+    "source": "environment/p04_tree_round.glb",
+    "target": "models/environment-p04_tree_round.glb",
+    "sha256": "8e0ddc62e3c5a66dcd2bcba37d3c013215d7339e727662dcd52152474fb17ff9"
+  },
+  {
+    "source": "environment/p05_tree_layered.glb",
+    "target": "models/environment-p05_tree_layered.glb",
+    "sha256": "f00275ebdf31dcc99871b8c0e27d225ebfd78b8ab9e88f967e62a331ea85d0c8"
+  },
+  {
+    "source": "environment/b01_dome.glb",
+    "target": "models/camp-dome.glb",
+    "sha256": "647b339cc58cfe89358c97e628c9b43a9a198b62b42c4ee3ae6f23888cd7f510"
+  },
+  {
+    "source": "environment/b02_cube.glb",
+    "target": "models/camp-cube.glb",
+    "sha256": "b36ce717fa9c52efdcdf7e7a5382590c27e622b07ddb4d83a291cd887798af30"
+  },
+  {
+    "source": "environment/b03_door.glb",
+    "target": "models/camp-door.glb",
+    "sha256": "64537ef4cc83f6f4c5d02a8505ba04ec896d251243f6ab61b1826dd5df4439c3"
+  },
+  {
+    "source": "environment/b04_fence.glb",
+    "target": "models/camp-fence.glb",
+    "sha256": "4aed3d8da4613e2b3560857acbdedcca3e5befa5e9ccc835118c09e2624d1a0b"
+  },
+  {
+    "source": "environment/b05_lamp.glb",
+    "target": "models/camp-lamp.glb",
+    "sha256": "41862b92ac00a856d4604855da6375bea23595ff9a94381b8527a474457e966b"
+  },
+  {
+    "source": "environment/b06_sign.glb",
+    "target": "models/camp-sign.glb",
+    "sha256": "509f85d67acdaadce8b793718ab371d26714bce56bc9f8fba077c55b5da2548a"
+  },
+  {
+    "source": "environment/b06_sign_home.glb",
+    "target": "models/environment-b06_sign_home.glb",
+    "sha256": "743aaaeb4549f969e20b34de1ffe71e3edf324365e52ef9b776d5d7beeeabe10"
+  },
+  {
+    "source": "environment/b07_energy.glb",
+    "target": "models/camp-energy.glb",
+    "sha256": "f9cebf302d88aebf6412ffa6588b5327d6b28c73b239c02394eb2b0e5b9f54f5"
+  },
+  {
+    "source": "environment/float_ring.glb",
+    "target": "models/environment-float_ring.glb",
+    "sha256": "641883c29eabe4254e39089df5a87127737a801afb3b04d100f4a78df44eba1c"
+  },
+  {
+    "source": "environment/float_ball.glb",
+    "target": "models/environment-float_ball.glb",
+    "sha256": "c3403d5bb39e180026a029e5b915de208003c507cbdf892c89cbd0e2814c5356"
+  },
+  {
+    "source": "pets/pets.json",
+    "target": "docs/asset-guide/pets.json",
+    "sha256": "304de6ca1662562cb7fd0cd8b6b398d6581e37f004e20181772a1a64af272196"
+  },
+  {
+    "source": "pets/pet_slime_ring.glb",
+    "target": "models/slime-ring.glb",
+    "sha256": "19dae60fb54cf60ada9b6881e2637f0eead1244282b65c8f9489cdb4c6476263"
+  },
+  {
+    "source": "pets/pet_slime_ball.glb",
+    "target": "models/slime-ball.glb",
+    "sha256": "4dc9193464c76798de056ed315d875d91a5fa936d5f88744460bfd54cbb1f059"
+  },
+  {
+    "source": "pets/pet_knife_shiba.glb",
+    "target": "models/knife-shiba.glb",
+    "sha256": "e09e330df1f4b0d13c3989c203ad8597e36a21de7b43882410cddf21a4fcd018"
+  },
+  {
+    "source": "pets/pet_kangaroo_peek.glb",
+    "target": "models/kangaroo-peek.glb",
+    "sha256": "4e8927f0995174a8ed7709cf1c0ac88192d14378bdf7340c1421ba9ca92ed3b0"
+  },
+  {
+    "source": "pets/pet_bull_aloof.glb",
+    "target": "models/bull-aloof.glb",
+    "sha256": "ad34747f1b6cb74f44cf04525e34e28770c245046e1e4b3b3c4e45ae242127f2"
+  },
+  {
+    "source": "pets/pet_baby_laugh.glb",
+    "target": "models/baby-laugh.glb",
+    "sha256": "6cf4a2d0a3ca73aa534d01cc6dbb4b49199502386f090661c1554c548fb8987e"
+  },
+  {
+    "source": "pets/pet_sunny_sun.glb",
+    "target": "models/sunny-sun.glb",
+    "sha256": "9eea8408d108317dc78ba4af8e2690438323208407bd112d8d0f6dabc80c750c"
+  },
+  {
+    "source": "pets/pet_mind_sphere.glb",
+    "target": "models/mind-sphere.glb",
+    "sha256": "b62e5d91f310d1e64da023eead1ba11012dad1afe1165b9a44ed61c5304e03b1"
+  },
+  {
+    "source": "pets/variants/pet_knife_shiba_lod0.glb",
+    "target": "models/variants/pet_knife_shiba_lod0.glb",
+    "sha256": "9dab80abe364ffb376e726ffb1fb409646c0477db0e9cefe5781fdc3a4b45223"
+  },
+  {
+    "source": "pets/variants/pet_sunny_sun_singleview.glb",
+    "target": "models/variants/pet_sunny_sun_singleview.glb",
+    "sha256": "9c4e96601f390b0f381e65c1dc116876dc86ec5c4ed1d3b6602adad3d8d3797e"
+  },
+  {
+    "source": "pets/variants/pet_sunny_sun_singleview_v2.glb",
+    "target": "models/variants/pet_sunny_sun_singleview_v2.glb",
+    "sha256": "145530aab4d2be31438a09da7fb1c3ce3573debece92926ddc8ed0caa5aa6774"
+  },
+  {
+    "source": "pets/variants/pet_sunny_sun_raw.glb",
+    "target": "models/variants/pet_sunny_sun_raw.glb",
+    "sha256": "0149a06ddb3f279a857a411b7e1646abc025a9e5c83fda0b93380934b73f3be6"
+  },
+  {
+    "source": "pets/variants/pet_mind_sphere_head.glb",
+    "target": "models/variants/pet_mind_sphere_head.glb",
+    "sha256": "c78168fb45c86d6f90c4e62a24015fef82e144f999dd291f7c4436e7a12b986c"
+  }
+]

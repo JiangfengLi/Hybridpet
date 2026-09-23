@@ -145,7 +145,7 @@ ok(meshCount > 60, '可渲染对象 >60（实际 ' + meshCount + '）');
   const slimeN = animals.filter(a => a.species.glb).length;
   const procN = animals.length - slimeN;
   console.log('  动物构成 = 程序化 ' + procN + ' 只 + 史莱姆 ' + slimeN + ' 只');
-  ok(procN === 0 && slimeN === 40, '动物 40 只，全部是导入的（程序化 ' + procN + ' + 史莱姆 ' + slimeN + '）');
+  ok(procN === 0 && slimeN === 58, '动物 58 只，全部是导入的（程序化 ' + procN + ' + GLB ' + slimeN + '）');
 }
 /* 这一行原来是「信号源 12 个」。信号源整套删掉后，改成守"场景里确实没有信标实体"，
    而**不是**连断言一起删 —— 删掉的话，将来有人把信标加回来这里也不会响。
@@ -162,8 +162,8 @@ ok(meshCount > 60, '可渲染对象 >60（实际 ' + meshCount + '）');
   ok(proc.every(sp => typeof sp.build === 'function'),
      '它们的建模函数还在（删掉那一行 spawn:false 就能放回场上）');
   const spawnable = SPECIES_LIST.filter(sp => sp.spawn !== false);
-  ok(spawnable.length === 2 && spawnable.every(sp => sp.glb),
-     '真正会生成的只有导入的两种史莱姆（' + spawnable.map(s => s.key).join(', ') + '）');
+  ok(spawnable.length === 8 && spawnable.every(sp => sp.glb),
+     '生成 8 种导入生物（' + spawnable.map(s => s.key).join(', ') + '）');
 }
 ok(typeof signalObjs === 'undefined', '信号源对象数组已删（不是留了个空数组）');
 ok(typeof signals === 'undefined', 'signals 坐标数组这个名字已彻底改掉（现名 signalBlanks）');
@@ -197,16 +197,16 @@ ok(corpses.length === 0 && Array.isArray(corpses), '开局没有尸体（corpses
        程序化物种走 SEED+4242。所以它们**不是** rndWorld 的漂移哨兵，
        而是"内容账目"：本轮把数量从 8 改成 40 是有意的，
        这两条**必然**要跟着改 —— 改它们不等于哨兵失效。
-   两条真哨兵（营地中心、植被 101）本轮**没有动过**，说明删程序化物种
-   / 改史莱姆数量都没有碰着 rndWorld。 */
+   AssetPack 接入后营地等待植被完成，再按实测占地选址；
+   中心为 (0.33, 63.86)，避免与植被相交。树已恢复原模型，植被仍为 101 个。 */
 {
   const camp = campStats.center;
   ok(campStats.models === 7 && campStats.failed.length === 0, '营地 7 件全部装配（' + campStats.models + '）');
-  ok(Math.abs(camp.x - (-20.56)) < 0.01 && Math.abs(camp.z - 45.47) < 0.01,
-     '随机流未漂移：营地中心仍是 (-20.56, 45.47)（实测 ' + camp.x.toFixed(2) + ', ' + camp.z.toFixed(2) + '）');
+  ok(Math.abs(camp.x - 0.33) < 0.01 && Math.abs(camp.z - 63.86) < 0.01,
+     '新植被避让后营地中心固定为 (0.33, 63.86)（实测 ' + camp.x.toFixed(2) + ', ' + camp.z.toFixed(2) + '）');
   ok(propStats.instances === 101, '随机流未漂移：植被/岩石实例数仍是 101（实测 ' + propStats.instances + '）');
-  ok(slimeStats.instances === 40, '史莱姆 40 只（两种各 20 —— 补回原来 41 只的密度感）');
-  ok(animals.length === 40, '动物总数 40（= 40 只史莱姆；程序化物种不上场）');
+  ok(slimeStats.instances === 58, '导入生物 58 只（史莱姆各 20、新增六种各 3）');
+  ok(animals.length === 58, '动物总数 58；程序化物种不上场');
   /* 史莱姆落点用 s 锚一个：slime-ring 前 4 只在数量变化后**落点不变**
      （它们消费的还是流的最前面那几次），第 5 只开始才会分化。
      钉住第 0 只 ⇒ 既守"流没被额外消费"，也不会因为"数量改了"而误报。 */
@@ -331,10 +331,10 @@ ok(!('wind' in state) && !('windT' in state), 'state 上不再有 wind / windT�
    图鉴撤了，但 SPECIES_LIST **必须还在** —— 它不只是图鉴，
    动物的物种 / 数量 / 体型区间 / 是否飞行 / glb 模型名全在这张表里，
    是第 9 节建 41 只动物的唯一依据。删了它动物就全没了。 */
-ok(SPECIES_LIST.length === 7 &&
+ok(SPECIES_LIST.length === 13 &&
    SPECIES_LIST.every(sp => sp.key && sp.name && sp.count > 0) &&
-   SPECIES_LIST.reduce((a, sp) => a + sp.count, 0) === 73,
-   'SPECIES_LIST 仍在（7 个物种；count 之和 73 = 程序化 33 + 导入 40）');
+   SPECIES_LIST.reduce((a, sp) => a + sp.count, 0) === 91,
+   'SPECIES_LIST 仍在（13 个物种；count 之和 91 = 未生成的程序化 33 + 导入 58）');
 
 /* E 键必须**真的解绑**，而不是绑了个空函数 —— 后者会留下一个假的接线口。
    判据：按住 E 跑几帧，弹夹 / 尸体 / 场景对象数都不许动，体力也不许出现"大额回气"。
@@ -824,8 +824,8 @@ ok(campMeshes.length === campStats.models, '每件一个 InstancedMesh（' + cam
 
 sec('9d. 史莱姆（唯一的导入物种，也是场上全部生物）');
 ok(slimeStats.failed.length === 0,
-   '2 个史莱姆模型全部解析成功（失败 ' + slimeStats.failed.length + ' 项：' + (slimeStats.failed.join('; ') || '无') + '）');
-ok(slimeStats.models === 2, '装配 2 种史莱姆（实际 ' + slimeStats.models + '）');
+   '8 个生物模型全部解析成功（失败 ' + slimeStats.failed.length + ' 项：' + (slimeStats.failed.join('; ') || '无') + '）');
+ok(slimeStats.models === 8, '装配 8 种生物（实际 ' + slimeStats.models + '）');
 {
   const want = SPECIES_LIST.filter(sp => sp.glb).reduce((a, sp) => a + sp.count, 0);
   ok(slimeStats.instances === want, '史莱姆实例数 = 各类 count 之和（' + slimeStats.instances + ' / ' + want + '）');
@@ -844,16 +844,17 @@ ok(slimeStats.models === 2, '装配 2 种史莱姆（实际 ' + slimeStats.model
     if (kids.length !== 1) bad.push(a.species.key + ' 子 Mesh ' + kids.length + ' 个');
   }
   ok(bad.length === 0, '史莱姆的实体契约完整（问题 ' + bad.length + ' 个：' + (bad.slice(0, 3).join('; ') || '无') + '）');
-  ok(slimes.length === 40, '场上有 40 只史莱姆（两种各 20，实际 ' + slimes.length + '）');
+  ok(slimes.length === 58, '场上有 58 只导入生物（实际 ' + slimes.length + '）');
   const keys = [...new Set(slimes.map(a => a.species.key))].sort();
-  ok(keys.join(',') === 'slime-ball,slime-ring', '两个物种都在场上（' + keys.join(',') + '）');
+  ok(keys.join(',') === 'baby-laugh,bull-aloof,kangaroo-peek,knife-shiba,mind-sphere,slime-ball,slime-ring,sunny-sun',
+     '八个物种都在场上（' + keys.join(',') + '）');
 }
 /* 果冻材质**确实被降级了**：这个断言挡的是"哪天有人把 transmission 改回去"。
    降级不只是观感选择 —— three 里 material.transmission > 0 会让每帧多渲一遍
    半分辨率全场景，是这个场景里最贵的一条路径。 */
 {
   const bad = [];
-  for (const a of animals.filter(x => x.species.glb)) {
+  for (const a of animals.filter(x => x.species.key === 'slime-ring' || x.species.key === 'slime-ball')) {
     const m = a.g.children.find(o => o.isMesh).material;
     if (m.transmission > 0) bad.push(a.species.key + ' transmission=' + m.transmission);
     if (!m.transparent) bad.push(a.species.key + ' 不是半透明');

@@ -1,0 +1,125 @@
+{
+  "pack": "pets",
+  "version": "2026-09-23",
+  "note": "Pet asset pack matched to the 32-slot gene table (DESIGN-genes.md / GENE_DEFS in index.html). genome[i] = option index of slot i. Naming is English only.",
+  "geneSlots": [
+    { "n": 1,  "key": "skeleton",  "label": "Skeleton",   "opts": ["no skeleton points"] },
+    { "n": 2,  "key": "body",      "label": "Body size",  "opts": ["A same as slime-ring", "B 40% bigger", "C 80% bigger", "D 120% bigger", "E width+depth 80% bigger, height same", "F height 80% bigger, width+depth same"] },
+    { "n": 3,  "key": "bodyColor", "label": "Body color", "opts": ["red", "yellow", "blue", "green", "purple", "light red", "light yellow", "light blue", "light green", "light purple", "gray", "black", "white"] },
+    { "n": 4,  "key": "bodyTex",   "label": "Body texture", "opts": ["smooth", "slimy", "rough", "jelly", "crystal", "metal", "furry", "shell"] },
+    { "n": 5,  "key": "bodyForm",  "label": "Body form",  "opts": ["sphere", "naiLong", "standard mammal", "slime shape"] },
+    { "n": 6,  "key": "eyeOn",     "label": "Eyes present", "opts": ["yes", "no"] },
+    { "n": 7,  "key": "eyeColor",  "label": "Eye color",  "opts": "same 13 colors as slot 3" },
+    { "n": 8,  "key": "eyeForm",   "label": "Eye form",   "opts": ["animal eye", "machine eye", "snail eye", "emoji eye"] },
+    { "n": 9,  "key": "earOn",     "label": "Ears present", "opts": ["yes", "no"] },
+    { "n": 10, "key": "earColor",  "label": "Ear color",  "opts": "same 13 colors as slot 3" },
+    { "n": 11, "key": "earForm",   "label": "Ear form",   "opts": ["animal ear", "machine ear", "emoji ear", "elf ear"] },
+    { "n": 12, "key": "hornOn",    "label": "Horn/crown present", "opts": ["yes", "no"] },
+    { "n": 13, "key": "hornColor", "label": "Horn/crown color", "opts": "same 13 colors as slot 3" },
+    { "n": 14, "key": "hornForm",  "label": "Horn/crown form", "opts": ["sheep horn", "bull horn", "unicorn", "crown", "helmet", "machine antenna"], "note": "source table skips E; only 6 options" },
+    { "n": 15, "key": "wingOn",    "label": "Wings present", "opts": ["yes", "no"] },
+    { "n": 16, "key": "wingColor", "label": "Wing color", "opts": "same 13 colors as slot 3" },
+    { "n": 17, "key": "wingForm",  "label": "Wing form",  "opts": ["feather wing", "pterosaur wing", "propeller"] },
+    { "n": 18, "key": "tailOn",    "label": "Tail present", "opts": ["yes", "no"] },
+    { "n": 19, "key": "tailColor", "label": "Tail color", "opts": "same 13 colors as slot 3" },
+    { "n": 20, "key": "tailForm",  "label": "Tail form",  "opts": ["beast tail", "dinosaur tail", "fish tail", "machine tail"] },
+    { "n": 21, "key": "backOn",    "label": "Back feature present", "opts": ["yes", "no"] },
+    { "n": 22, "key": "backColor", "label": "Back feature color", "opts": "same 13 colors as slot 3" },
+    { "n": 23, "key": "backForm",  "label": "Back feature form", "opts": ["dragon fin", "sword bone", "back machine gun", "backpack"] },
+    { "n": 24, "key": "limbOn",    "label": "Limbs present", "opts": ["yes", "no"] },
+    { "n": 25, "key": "limbColor", "label": "Limb color", "opts": "same 13 colors as slot 3" },
+    { "n": 26, "key": "limbForm",  "label": "Limb form",  "opts": ["standard small animal", "standard big animal"] },
+    { "n": 27, "key": "clawOn",    "label": "Claws present", "opts": ["yes", "no"] },
+    { "n": 28, "key": "clawColor", "label": "Claw color", "opts": "same 13 colors as slot 3" },
+    { "n": 29, "key": "clawForm",  "label": "Claw form",  "opts": ["sharp", "giant"] },
+    { "n": 30, "key": "glowOn",    "label": "Glow organ present", "opts": ["yes", "no"] },
+    { "n": 31, "key": "glowColor", "label": "Glow organ color", "opts": "same 13 colors as slot 3" },
+    { "n": 32, "key": "glowForm",  "label": "Glow organ form", "opts": ["anglerfish lure", "machine indicator"] }
+  ],
+  "colorSlots": ["red", "yellow", "blue", "green", "purple", "light red", "light yellow", "light blue", "light green", "light purple", "gray", "black", "white"],
+  "pets": [
+    {
+      "key": "slime-ring", "nameEn": "Ring Slime", "cn": "浮环史莱姆",
+      "file": "pet_slime_ring.glb", "tris": 4959,
+      "rawSize": [0.795, 0.979, 0.998], "inGameBox": "A (1.488 x 1.832 x 1.869 m)",
+      "measured": { "transmission": true, "roughness": 0.12, "runtimeOpacity": 0.72, "avgBaseColor": "#d2ccbd", "dominantColor": "#ddd1bd" },
+      "confidence": { "color": "measured", "texture": "measured", "parts": "measured (single mesh, no separate part)", "form": "stated by user" },
+      "genome": [0,0,6,3,0, 1,6,0, 1,6,0, 1,6,0, 1,6,0, 1,6,0, 1,6,0, 1,6,0, 1,6,0, 1,6,0]
+    },
+    {
+      "key": "slime-ball", "nameEn": "Sticky Blob Slime", "cn": "粘球史莱姆",
+      "file": "pet_slime_ball.glb", "tris": 4840,
+      "rawSize": [0.998, 0.721, 0.834], "inGameBox": "A (1.488 x 1.832 x 1.869 m)",
+      "measured": { "transmission": true, "roughness": 0.12, "runtimeOpacity": 0.72, "avgBaseColor": "#79b3d8", "dominantColor": "#6ba5d8" },
+      "confidence": { "color": "measured", "texture": "measured", "parts": "measured (single mesh)", "form": "stated by user" },
+      "genome": [0,0,7,3,0, 1,7,0, 1,7,0, 1,7,0, 1,7,0, 1,7,0, 1,7,0, 1,7,0, 1,7,0, 1,7,0]
+    },
+    {
+      "key": "knife-shiba", "nameEn": "Knife-Shield Shiba Ball", "cn": "持刀盾柴犬球",
+      "file": "pet_knife_shiba.glb", "tris": 324,
+      "rawSize": [0.713, 0.877, 0.998], "inGameBox": "S in current code (1.136 x 1.408 x 1.600 m) - NOT a gene grade, see notes",
+      "measured": { "transmission": false, "roughness": 1.0, "metallic": 1.0, "avgBaseColor": "#c4a269" },
+      "confidence": { "color": "derived from average texture color", "texture": "judgment (furry, mammalian)", "parts": "judgment (eyes/ears/tail/limbs yes)", "form": "judgment (sphere - it is a shiba BALL)" },
+      "genome": [0,0,1,6,0, 0,1,0, 0,1,0, 1,1,0, 1,1,0, 0,1,0, 1,1,0, 0,1,0, 1,1,0, 1,1,0]
+    },
+    {
+      "key": "kangaroo-peek", "nameEn": "Peeking Kangaroo", "cn": "P-01 偷偷看袋鼠",
+      "file": "pet_kangaroo_peek.glb", "tris": 4746,
+      "rawSize": [0.998, 0.998, 0.881], "inGameBox": "not in game yet",
+      "measured": { "transmission": false, "roughness": 1.0, "metallic": 1.0, "avgBaseColor": "#e3af52" },
+      "confidence": { "color": "derived", "texture": "judgment (furry)", "parts": "judgment", "form": "judgment (standard mammal)" },
+      "genome": [0,0,1,6,2, 0,1,3, 0,1,0, 1,1,0, 1,1,0, 0,1,0, 1,1,0, 0,1,0, 1,1,0, 1,1,0]
+    },
+    {
+      "key": "bull-aloof", "nameEn": "Aloof Bull", "cn": "P-03 冷淡牛",
+      "file": "pet_bull_aloof.glb", "tris": 4894,
+      "rawSize": [0.971, 0.826, 0.998], "inGameBox": "not in game yet",
+      "measured": { "transmission": false, "roughness": 1.0, "metallic": 1.0, "avgBaseColor": "#b28b4d", "dominantColor": "#5b4829" },
+      "confidence": { "color": "weak - palette has no brown; picked yellow by hue family", "texture": "judgment (furry)", "parts": "judgment (bull horns certain)", "form": "judgment (standard mammal)" },
+      "genome": [0,0,1,6,2, 0,1,0, 0,1,0, 0,1,1, 1,1,0, 0,1,0, 1,1,0, 0,1,1, 1,1,0, 1,1,0]
+    },
+    {
+      "key": "baby-laugh", "nameEn": "Belly-Laugh Baby", "cn": "P-04 捧腹大笑奶娃",
+      "file": "pet_baby_laugh.glb", "tris": 5014,
+      "rawSize": [0.998, 0.994, 0.994], "inGameBox": "not in game yet",
+      "measured": { "transmission": false, "roughness": 1.0, "metallic": 1.0, "avgBaseColor": "#e9ab55" },
+      "confidence": { "color": "derived", "texture": "judgment (smooth - skin)", "parts": "judgment (emoji eyes)", "form": "judgment (standard mammal)" },
+      "genome": [0,0,1,0,2, 0,1,3, 0,1,0, 1,1,0, 1,1,0, 1,1,0, 1,1,0, 0,1,0, 1,1,0, 1,1,0]
+    },
+    {
+      "key": "sunny-sun", "nameEn": "Sunny the Sun", "cn": "太阳 Sunny",
+      "file": "pet_sunny_sun.glb", "tris": 2817,
+      "rawSize": [0.318, 0.998, 0.920], "inGameBox": "not in game yet",
+      "measured": { "transmission": false, "roughness": 0.18, "runtimeOpacity": 0.90, "avgBaseColor": "#f1ad3d" },
+      "confidence": { "color": "derived", "texture": "derived (translucent 0.90 + low roughness = jelly)", "parts": "judgment (eyes yes, glow organ yes)", "form": "judgment (sphere)" },
+      "genome": [0,0,1,3,0, 0,1,3, 1,1,0, 1,1,0, 1,1,0, 1,1,0, 1,1,0, 1,1,0, 1,1,0, 0,1,1]
+    },
+    {
+      "key": "mind-sphere", "nameEn": "Mind Probe Sphere", "cn": "C-01 心灵探测球",
+      "file": "pet_mind_sphere.glb", "tris": 2988,
+      "rawSize": [0.514, 0.998, 0.568], "inGameBox": "not in game yet",
+      "measured": { "transmission": false, "roughness": 1.0, "metallic": 1.0, "avgBaseColor": "#cc9b95", "dominantColor": "#fd8a8b" },
+      "confidence": { "color": "derived (light red / pink)", "texture": "judgment (smooth)", "parts": "judgment (eyes yes; limbs unverified, set to none)", "form": "judgment (sphere)" },
+      "genome": [0,0,5,0,0, 0,5,0, 1,5,0, 1,5,0, 1,5,0, 1,5,0, 1,5,0, 1,5,0, 1,5,0, 1,5,0]
+    }
+  ],
+  "variants": [
+    { "key": "knife-shiba-lod0", "file": "variants/pet_knife_shiba_lod0.glb", "tris": 60, "note": "minimum-face LOD" },
+    { "key": "sunny-sun-singleview", "file": "variants/pet_sunny_sun_singleview.glb", "tris": 2864 },
+    { "key": "sunny-sun-singleview-v2", "file": "variants/pet_sunny_sun_singleview_v2.glb", "tris": 2864 },
+    { "key": "sunny-sun-raw", "file": "variants/pet_sunny_sun_raw.glb", "tris": 4775 },
+    { "key": "mind-sphere-head", "file": "variants/pet_mind_sphere_head.glb", "tris": 1632, "note": "head only, cut at neck" }
+  ],
+  "pendingNoGlb": [
+    { "nameEn": "BabyLaugh x Bull fusion A", "concept": "Character_Fusion_BabyBull_GradualChimera_A.png" },
+    { "nameEn": "BabyLaugh x Bull fusion B", "concept": "Character_Fusion_BabyBull_UnifiedMascot_B.png" },
+    { "nameEn": "BabyLaugh x Bull concept", "concept": "Character_Fusion_BabyLaugh_Bull_P1_Concept.png" }
+  ],
+  "notes": [
+    "Body texture and body form are PROMPT-level dimensions, not measurable from the GLB (user decision 2026-09-23 10:16: the imported model does not have to match the gene).",
+    "Latent values: when a part is absent but later mutated to present, colors already carry the body color so the offspring stays coherent (different from current index.html which fills 0).",
+    "Body size: every imported pet is normalized to grade A in game (user: every creature must be standardized in size). knife-shiba currently uses box S, which is NOT one of the 6 gene grades - either add S to the table or move it to A.",
+    "environment/float_ring.glb and environment/float_ball.glb are the same meshes as pet_slime_ring / pet_slime_ball, taken from the Base variant (jelly transmission off).",
+    "4 procedural species in SPECIES_LIST (grazer, scuttler, hopper, ray, bird) have no GLB asset and do not spawn in the world today."
+  ]
+}

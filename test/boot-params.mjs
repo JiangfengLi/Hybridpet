@@ -53,7 +53,7 @@ ok(bag.materials === undefined, 'fill=1 → 不再有 materials（矿/孢子已�
 /* &slay=N：新的调试参数，走真实屠宰路径（slayPal('bag', 0)），不是往 corpses 里硬塞。
    玩家此刻在 alt=20 的空中 ⇒ 尸体应该落回地面（y = sampleHeight = 0）。 */
 ok(corpses.length === 1, 'slay=1 → 屠宰了 1 只（corpses ' + corpses.length + ' 具）');
-ok(animals.length === 39, 'slay=1 → 世界里少了 1 只（40 → ' + animals.length + '）');
+ok(animals.length === 57, 'slay=1 → 世界里少了 1 只（58 → ' + animals.length + '）');
 ok(corpses[0] && corpses[0].dead === true && corpses[0].g.visible === true,
    'slay=1 → 那具尸体是可见的、标着 dead');
 ok(corpses[0]?.slaughterPhase === 'launch', 'slay=1 先开始投射，不会跳过动画直接生成遗体');
@@ -115,7 +115,7 @@ ok(corpses[0] && !!corpses[0].species.glb === true,
    '宰的确实是**带贴图**的物种：' + (corpses[0] ? corpses[0].species.key : '(没有)') +
    '（注意 glb 是**模型名字符串**不是布尔：' +
    (corpses[0] ? JSON.stringify(corpses[0].species.glb) : '-') + '）');
-ok(animals.length === 39, '世界里少了 1 只（40 → ' + animals.length + '）');
+ok(animals.length === 57, '世界里少了 1 只（58 → ' + animals.length + '）');
 /* 守恒断言：fill 造出 弹夹 3 + 背包 3 = 6 只在手里，宰掉 1 只 ⇒ 手里还剩 5。
    **不写死 3 / 3** —— 写死会把"从哪只手里扣的"也钉进去，
    而那属于 &fill 的实现细节（本轮正因为 fill 的取法变了而失效过一次）。 */
@@ -147,7 +147,7 @@ ok(mag.length === 0 && pals.length === 0, '起点确实是空的（弹夹 ' + ma
 ok(corpses.length === 1, '还是宰掉了 1 只（corpses ' + corpses.length + '）');
 ok(corpses[0] && corpses[0].species.key === 'slime-ball',
    '宰的是指定物种：' + (corpses[0] ? corpses[0].species.key : '(没有)'));
-ok(animals.length === 39, '世界里少了 1 只（40 → ' + animals.length + '）');
+ok(animals.length === 57, '世界里少了 1 只（58 → ' + animals.length + '）');
 /* 抓来的那只当场就被宰了 ⇒ 手里应该回到空。这三条一起说明
    "抓 → 搬进背包 → 宰"整条路真的走完了，而不是"直接往 corpses 里塞了一具"。 */
 ok(mag.length === 0 && pals.length === 0,
