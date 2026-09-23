@@ -1,0 +1,8 @@
+.secrets/
+.tripo/
+outputs/tripo/
+__pycache__/
+*.pyc
+
+.tripo-server*.log
+_shots/
