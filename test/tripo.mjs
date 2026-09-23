@@ -30,6 +30,29 @@ await assert.rejects(()=>client.generate({id:'test',genome:[],prompt:'test'},{})
 assert.equal(submits,1);
 console.log('ok   unconfirmed submission stops without automatic resubmission');
 
+for (const [status, confirmed, expectedRetries] of [
+  ['unconfirmed',false,0], ['unconfirmed',true,1], ['rejected',false,1],
+]) {
+  let retries=0, prompts=0;
+  const retryClient=createTripoClient({required:true,
+    confirmUnsubmitted:()=>{prompts++;return confirmed;},
+    fetcher:async(path,options)=>{
+      if(path.endsWith('/config'))return {ok:true,json:async()=>({configured:true,token:'local-token'})};
+      if(path.endsWith('/resume')) {
+        retries++;
+        assert.equal(JSON.parse(options.body).confirm_unsubmitted,confirmed);
+        return {ok:true,json:async()=>({status:'failed',error:'retry reached server'})};
+      }
+      return {ok:true,json:async()=>({status,can_retry:status==='rejected',error:'original error'})};
+    },
+  });
+  await assert.rejects(()=>retryClient.generate({id:'same-id',genome:[0],prompt:'same genes'}, {},()=>{},true),
+    expectedRetries?/retry reached server/:/original error/);
+  assert.equal(retries,expectedRetries);
+  assert.equal(prompts,status==='unconfirmed'?1:0);
+}
+console.log('ok   explicit retry of rejected requests; unknown submissions require confirmation');
+
 await runGame(`
 ${DRIVER_HEAD}
 tripoClient.required=true;
@@ -104,9 +127,13 @@ const resolveModel=(call,id)=>call.resolve({
 resolveModel(calls[2],2);await tick();step();
 ok(chamberSystem.status(2).phase==='ready'&&chamberSystem.status(0).phase==='generating',
   'out-of-order completion unlocks only its own pod');
+calls[1].progress({status:'unconfirmed',submission_status:'unconfirmed'});
 calls[1].reject(new Error('pod 02 interrupted'));await tick();at(1);step();
 ok(chamberSystem.status(1).phase==='error'&&el('chamber-countdown').textContent==='pod 02 interrupted',
   'selected pod displays its own generation failure');
+ok(el('chamber-interact').textContent==='核对后重试','unknown submission offers console-check recovery');
+breeding.pairs[1].generation.submission_status='rejected';step();
+ok(el('chamber-interact').textContent==='重试提交','rejected submission offers explicit retry');
 const originalId=calls[1].job.id;
 chamberSystem.interact();
 ok(calls.length===4&&calls[3].job.id===originalId&&calls[3].resume,

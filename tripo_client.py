@@ -21,7 +21,19 @@ FORMATS = ("FBX", "OBJ", "STL", "GLTF", "USDZ", "3MF")
 
 
 class TripoError(Exception):
-    pass
+    def __init__(self, message, *, http_status=None, code=None, trace_id=None, rejected=False, reason='unknown'):
+        super().__init__(message)
+        self.http_status = http_status
+        self.code = code if type(code) is int else None
+        self.trace_id = trace_id if isinstance(trace_id, str) and re.fullmatch(r'[a-fA-F0-9-]{36}', trace_id) else None
+        self.rejected = rejected
+        self.reason = reason if reason in {'connection', 'timeout', 'invalid_response'} else 'unknown'
+
+
+# Only documented rejection codes establish that no task was accepted.
+REJECTION_CODES = {1002, 1003, 1004, 1005, 1007, 2000, 2002, 2003, 2004,
+                   2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013,
+                   2014, 2015, 2016, 2017, 2018, 2019}
 
 
 class Pending(TripoError):
@@ -112,15 +124,17 @@ class Client:
         if content_type:
             headers["Content-Type"] = content_type
         req = urllib.request.Request(BASE + path, data=body, headers=headers, method=method)
+        trace_id = None
         try:
             with self.opener.open(req, timeout=timeout) as response:
+                trace_id = response.headers.get('X-Tripo-Trace-ID')
                 data = json.load(response)
         except urllib.error.HTTPError as exc:
             # Do not print raw bodies: gateways may echo request credentials.
             try:
                 error = json.loads(exc.read())
                 code = error.get("code", "unavailable")
-                if not isinstance(code, int):
+                if type(code) is not int:
                     code = "unavailable"
             except (ValueError, AttributeError):
                 code = "unavailable"
@@ -128,19 +142,26 @@ class Client:
                     429: "Rate limit; query later."}.get(exc.code, "Check Tripo error documentation.")
             if method == "POST" and exc.code >= 500:
                 hint += " Submission may have been accepted; do not blindly resubmit."
-            raise TripoError(f"Tripo HTTP {exc.code}, code {code}. {hint}") from None
-        except (urllib.error.URLError, TimeoutError, OSError):
+            raise TripoError(f"Tripo HTTP {exc.code}, code {code}. {hint}",
+                             http_status=exc.code, code=code,
+                             trace_id=exc.headers.get('X-Tripo-Trace-ID') if exc.headers else None,
+                             rejected=400 <= exc.code < 500 and code in REJECTION_CODES) from None
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
             hint = "Submission outcome is unknown; do not resubmit automatically." if method == "POST" else "Retry this query later."
-            raise TripoError("Tripo connection failed. " + hint) from None
+            raise TripoError("Tripo connection failed. " + hint,
+                             reason="timeout" if isinstance(exc, TimeoutError) or isinstance(getattr(exc, "reason", None), TimeoutError) else "connection") from None
         except (ValueError, UnicodeError):
-            raise TripoError("Tripo returned invalid JSON; do not repeat a POST automatically.") from None
+            raise TripoError("Tripo returned invalid JSON; do not repeat a POST automatically.",
+                             trace_id=trace_id, reason="invalid_response") from None
         # Redact credentials if an upstream response unexpectedly echoes them.
         data = json.loads(json.dumps(data).replace(self.key, "[REDACTED]"))
         if not isinstance(data, dict) or data.get("code") != 0:
             code = data.get("code") if isinstance(data, dict) else "unavailable"
-            raise TripoError(f"Tripo business error {code}; check key, credits and parameters.")
+            code = code if type(code) is int else None
+            raise TripoError(f"Tripo business error {code}; check key, credits and parameters.",
+                             code=code, trace_id=trace_id, rejected=code in REJECTION_CODES)
         if not isinstance(data.get("data"), dict):
-            raise TripoError("Tripo response is missing data.")
+            raise TripoError("Tripo response is missing data.", trace_id=trace_id, reason="invalid_response")
         return data["data"]
 
     def get_task(self, identifier, timeout=45):

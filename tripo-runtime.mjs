@@ -59,6 +59,7 @@ export function cloneOffspring(THREE, source) {
 }
 
 export function createTripoClient({THREE, GLTFLoader, fetcher=(...args)=>fetch(...args),
+  confirmUnsubmitted=message=>globalThis.confirm?.(message)===true,
   pause=sleep, required=['http:','https:'].includes(globalThis.location?.protocol)}={}) {
   async function request(path, body) {
     const options = {signal:AbortSignal.timeout(60000)};
@@ -85,11 +86,19 @@ export function createTripoClient({THREE, GLTFLoader, fetcher=(...args)=>fetch(.
   async function generate(job, box, onProgress=()=>{}, resume=false) {
     // Reposting a local ID is idempotent: the server never repeats a Tripo POST.
     let result = await request('/api/tripo/jobs', {id:job.id, genome:job.genome, prompt:job.prompt});
-    if (resume && result.can_resume) result = await request('/api/tripo/jobs/'+job.id+'/resume', {});
+    if (resume) {
+      let confirmation = false;
+      if (result.status === 'unconfirmed' && !result.task_id) {
+        confirmation = await confirmUnsubmitted('上次提交结果未知。请先到 Tripo 控制台核对本次任务。\n\n只有确认没有创建任务时，才点击“确定”重新提交；否则点击“取消”，避免重复生成和扣费。\n\n是否已核对并确认没有创建任务？');
+      }
+      if (result.can_resume || result.can_retry || confirmation) {
+        result = await request('/api/tripo/jobs/'+job.id+'/resume', {confirm_unsubmitted:confirmation});
+      }
+    }
     const deadline = Date.now()+21*60*1000;
     let errors = 0;
     while (true) {
-      onProgress(result);
+      onProgress({...result, submission_status:result.status});
       if (result.status === 'success') {
         const model = await load(result.model_url, box);
         return {model, taskId:result.task_id, modelUrl:result.model_url, triangles:result.triangles};

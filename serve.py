@@ -83,7 +83,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if path == '/api/tripo/jobs':
                 return self.json_response(self.server.jobs.create(data), 202)
             if path.startswith('/api/tripo/jobs/') and path.endswith('/resume'):
-                return self.json_response(self.server.jobs.resume(path.split('/')[-2]))
+                return self.json_response(self.server.jobs.resume(path.split('/')[-2],
+                    confirm_unsubmitted=data.get('confirm_unsubmitted') is True))
             return self.json_response({'error': '接口不存在'}, 404)
         except (ValueError, OSError) as exc:
             message = str(exc) if isinstance(exc, ValueError) else '本地任务记录不可用'

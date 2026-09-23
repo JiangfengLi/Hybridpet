@@ -11,6 +11,35 @@ from tripo_client import Client, TripoError, download_asset, load_key, output_ur
 
 MODEL_VERSION = 'P1-20260311'
 FACE_LIMIT = 3000
+SUBMIT_HINTS = {1002: 'Tripo 密钥无效，请更新服务端密钥后重试',
+                1003: 'Tripo 请求格式错误', 1004: 'Tripo 生成参数无效',
+                1005: 'Tripo 密钥权限不足', 1007: 'Tripo 请求过于频繁，请稍后重试',
+                2000: 'Tripo 生成并发已满，请稍后重试',
+                2008: 'Tripo 未通过内容审核', 2009: 'Tripo 描述包含无效字符',
+                2010: 'Tripo 积分不足，请补充积分后重试',
+                2015: 'Tripo 模型版本已停用', 2016: 'Tripo 任务类型已停用',
+                2017: 'Tripo 模型版本参数无效'}
+
+
+def submission_error(exc):
+    # Never persist arbitrary exception text or upstream bodies (may echo keys).
+    known = isinstance(exc, TripoError)
+    rejected = known and exc.rejected
+    details = {key: getattr(exc, key) for key in ('http_status', 'code', 'trace_id')
+               if known and getattr(exc, key) is not None}
+    if rejected:
+        message = SUBMIT_HINTS.get(exc.code, 'Tripo 拒绝了生成请求，请检查参数后重试')
+    else:
+        reason = exc.reason if known else 'unknown'
+        details['reason'] = reason
+        hint = {'timeout': '等待 Tripo 提交响应超时', 'connection': '连接 Tripo 时网络中断',
+                'invalid_response': 'Tripo 返回的数据格式异常'}.get(reason, 'Tripo 响应异常或本地保存失败')
+        message = hint + '，提交结果未知；请先核对控制台任务'
+    suffix = ', '.join(str(details[key]) for key in ('http_status', 'code') if key in details)
+    return {'status': 'rejected' if rejected else 'unconfirmed',
+            'error': message + ('（' + suffix + '）' if suffix else ''),
+            'submission_error': details}
+
 GENE_OPTIONS = [1,6,13,8,4,2,13,4,2,13,4,2,13,6,2,13,3,2,13,4,2,13,4,2,13,2,2,13,2,2,13,2,4,5,5,5]
 
 
@@ -124,11 +153,12 @@ class JobStore:
             return record
 
     def public(self, record):
-        keys = ('id', 'task_id', 'status', 'progress', 'error', 'triangles')
+        keys = ('id', 'task_id', 'status', 'progress', 'error', 'triangles', 'submission_error')
         result = {key: record[key] for key in keys if key in record}
         if record.get('status') == 'success':
             result['model_url'] = '/api/tripo/models/' + record['id'] + '.glb'
         result['can_resume'] = bool(record.get('task_id')) and record.get('status') in ('interrupted', 'download_error')
+        result['can_retry'] = not record.get('task_id') and record.get('status') == 'rejected'
         return result
 
     def create(self, data):
@@ -159,9 +189,24 @@ class JobStore:
         self.workers.add(identifier)
         threading.Thread(target=self.run, args=(identifier, submit), daemon=True).start()
 
-    def resume(self, identifier):
+    def resume(self, identifier, confirm_unsubmitted=False):
         with self.lock:
             record = self.read(identifier)
+            if identifier in self.workers:
+                return self.public(record)
+            retry = not record.get('task_id') and (record['status'] == 'rejected' or
+                    record['status'] == 'unconfirmed' and confirm_unsubmitted is True)
+            if retry:
+                if self.workers:
+                    raise ValueError('另一个模型仍在生成，请稍后重试')
+                if not self.configured():
+                    raise ValueError('未配置 Tripo 密钥，请检查本地服务配置')
+                history = record.get('submission_history', []) + [{
+                    key: record[key] for key in ('status', 'error', 'submission_error') if key in record}]
+                self.update(identifier, status='submitting', error='', submission_error={},
+                            submission_history=history, confirmed_unsubmitted=confirm_unsubmitted is True)
+                self.launch(identifier, submit=True)
+                return self.public(self.read(identifier))
             if identifier not in self.workers and record.get('task_id') and record['status'] not in ('failed', 'success', 'invalid_model'):
                 self.update(identifier, status='queued', error='')
                 self.launch(identifier)
@@ -193,8 +238,8 @@ class JobStore:
                     })
                     remote = task_id(result['task_id'])
                     self.update(identifier, task_id=remote, status='queued')
-                except Exception:
-                    self.update(identifier, status='unconfirmed', error='Tripo 提交未确认，请检查密钥、余额和控制台任务；不会自动重复提交')
+                except Exception as exc:
+                    self.update(identifier, **submission_error(exc))
                     return
             remote = self.read(identifier)['task_id']
             deadline = time.monotonic() + 20 * 60

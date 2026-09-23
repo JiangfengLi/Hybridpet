@@ -194,7 +194,7 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
     const canEquip=['sealing','irradiating'].includes(phase)&&distance()<10&&player.y<6&&!equipped;
     const canStow=equipped&&host.canStowWater?.();
     const state=JSON.stringify([phase,parents.map(p=>p?.species.name),host.loadedName(),aimed,progress,
-      notice,child?.species.name,generation?.error,equipped,canEquip,canStow,mutation]);
+      notice,child?.species.name,generation?.error,generation?.submission_status,equipped,canEquip,canStow,mutation]);
     if(state!==lastHud) {
       lastHud=state;hud.dataset.phase=phase;
       hud.dataset.chamber=String(id);
@@ -217,7 +217,7 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
       $('chamber-suck').textContent=phase==='error'?'结束本次孕育':'吸回';
       $('chamber-suck').disabled=equipped||phase!=='error'&&phase!=='complete'&&(phase!=='loading'||![0,1].includes(aimed)||!parents[aimed]);
       $('chamber-interact').disabled=!canConfirm&&!canEquip&&!canStow&&!['ready','complete','error'].includes(phase)&&!(phase==='loading'&&parents.every(Boolean));
-      $('chamber-interact').textContent=phase==='irradiating'?'确认生成':canStow?'收起爱心辐射枪 · E':canEquip?'领取爱心辐射枪 · E':phase==='error'?'继续查询 / 加载':
+      $('chamber-interact').textContent=phase==='irradiating'?'确认生成':canStow?'收起爱心辐射枪 · E':canEquip?'领取爱心辐射枪 · E':phase==='error'?(generation?.submission_status==='rejected'?'重试提交':generation?.submission_status==='unconfirmed'?'核对后重试':'继续查询 / 加载'):
         phase==='complete'?'收下后代':phase==='loading'?'再次孕育':
         phase==='sealing'?'舱门密封中':phase==='generating'?'模型生成中':'开始结合';
     }
