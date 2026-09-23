@@ -32,6 +32,8 @@ for(let id=0;id<3;id++) {
   ok(breeding.slots[id*2]===parents[id*2]&&breeding.slots[id*2+1]===parents[id*2+1],
     'parent ownership stays with pod '+id);
   plans.push(JSON.stringify(breeding.pairs[id].genome));
+  step(90);
+  ok(chamberSystem.confirmRadiation(),'confirm generation for pod '+id);
   if(id<2)breedAdvance(500);
 }
 ok(mag.length===0&&new Set(breeding.slots).size===6,'six distinct parents leave the magazine once');

@@ -32,7 +32,7 @@ const flightB64 = fs.readFileSync(path.join(HERE, 'assets', 'jetpack-flight.wav'
 const chamberFiles = [
   'vendor/cannon-es.mjs', 'bone-physics.mjs',
   'vendor/meshopt_decoder.module.js', 'tripo-runtime.mjs',
-  'chamber-water.mjs', 'water-gun.mjs',
+  'chamber-water.mjs', 'water-gun.mjs', 'mutation-rate.mjs',
   'fusion-v1/wave-motion.mjs', 'fusion-v1/recombination-motion.mjs',
   'fusion-v1/combine-session.mjs', 'fusion-v1/jelly-deform.mjs',
   'fusion-v1/game-actor.mjs', 'fusion-v1/surface-contact.js',
@@ -171,6 +171,8 @@ let hit = 0;
 const SWAPS = [[BOOT, BOOT_STANDALONE], [BOOT_GLTF, BOOT_GLTF_STANDALONE], [BOOT_CHAMBER, BOOT_CHAMBER_STANDALONE],
   ["const {createWaterGun} = await import('./water-gun.mjs');",
    "const {createWaterGun} = await import(__chamberUrls.get('water-gun.mjs'));"],
+  ["const {BASE_MUTATION_RATE,normalizedRadiation,createInheritancePlan,resolveInheritancePlan} = await import('./mutation-rate.mjs');",
+   "const {BASE_MUTATION_RATE,normalizedRadiation,createInheritancePlan,resolveInheritancePlan} = await import(__chamberUrls.get('mutation-rate.mjs'));"],
   ["const {createBonePhysics} = await import('./bone-physics.mjs');",
    "const {createBonePhysics} = await import(__chamberUrls.get('bone-physics.mjs'));"],
   ["const {createTripoClient, cloneOffspring, disposeModel} = await import('./tripo-runtime.mjs');",

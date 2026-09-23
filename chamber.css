@@ -8,6 +8,7 @@
 .chamber-slots span:last-child{border-color:#dcc074}
 .chamber-slots .aimed{background:#d9efeb}
 #chamber-countdown{min-height:20px;margin:6px 0;color:#6a7661;text-align:right;font-variant-numeric:tabular-nums}
+#chamber-mutation{min-height:20px;margin:4px 0 8px;color:#ab3c70;text-align:right;font-variant-numeric:tabular-nums}
 .chamber-controls{display:grid;grid-template-columns:1fr 46px 46px;align-items:center;gap:6px}
 #chamber-loaded{min-width:0;overflow-wrap:anywhere;color:#5d7377}
 #chamber-hud button,#chamber-performance button{min-height:36px;border:1px solid #a7c3be;border-radius:5px;background:#f3f9f6;color:#29454c;font:inherit;cursor:pointer;padding:6px 10px;letter-spacing:0}

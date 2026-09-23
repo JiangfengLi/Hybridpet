@@ -227,7 +227,7 @@ export function createChamberView(THREE, scene, camera, {position=CHAMBER_POSITI
     shutter.visible=openness<.995;
     shutter.scale.y=Math.max(.01,1-ease);
     shutter.position.y=4.19-1.365*(1-ease);
-    const incubating=(phase==='sealing'||phase==='generating')
+    const incubating=['sealing','irradiating','generating'].includes(phase)
       &&openness<=.001&&slots.every(slot=>slot.actor);
     incubationRoot.visible=incubating;
     let contacts=0;
@@ -275,7 +275,7 @@ export function createChamberView(THREE, scene, camera, {position=CHAMBER_POSITI
     }
     const percent=Math.floor(Math.max(0,Math.min(100,progress)));
     if(phase!==lastPhase||percent!==lastProgress) {
-      screen.set(['sealing','generating'].includes(phase)?(offline?'DEMO ':'')+percent+'%':
+      screen.set(phase==='irradiating'?'RADIATION':['sealing','generating'].includes(phase)?(offline?'DEMO ':'')+percent+'%':
         ({loading:'STANDBY',error:'RETRY',ready:'100% READY',playing:'FUSION',complete:'NEW LIFE'})[phase]||'STANDBY');
       lastPhase=phase;lastProgress=percent;
     }

@@ -63,6 +63,8 @@ ok(chamberWater.getState(2).value===0,'idle pod blocks the stream but does not g
 origin.set(0,2.7,14);direction.set(0,0,1);
 for(let i=0;i<400;i++)chamberSystem.sprayWater(origin,direction,.05,12);
 ok(chamberWater.getState(0).value===1,'water meter saturates at 100 percent');
+ok(chamberSystem.status(0).phase==='generating'&&breeding.pairs[0].mutationRate===.25&&breeding.pairs[0].genesLocked,
+  'full radiation automatically locks a 25 percent mutation rate and starts generation');
 ok(events.length===4&&events.every(event=>event.chamberId===0&&event.taskId===1),
   'thresholds emit once with pod and task ownership');
 step();
@@ -99,6 +101,8 @@ chamberSystem.interact();
 for(let i=0;i<10;i++)chamberSystem.boost();
 for(let i=0;i<1600&&chamberSystem.cinematic;i++)step();
 ok(chamberSystem.status(0).phase==='complete','combination completes with a newborn');
+ok(chamberSystem.child.mutationRate===.25&&chamberSystem.child.radiationProgress===1,
+  'newborn retains the applied mutation probability after the meter resets');
 ok(chamberWater.getState(0).value===0&&chamberSystem.status(0).view.waterPercent===0,
   'combination completion immediately resets both water state and display');
 ok(chamberWater.getState(1).value===accumulated,'completion leaves other pods water unchanged');

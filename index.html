@@ -620,6 +620,7 @@
   <header><span id="chamber-name">GENESIS / 01</span><b id="chamber-phase">等待亲代</b></header>
   <div class="chamber-slots"><span id="chamber-left">左槽 · 空</span><span id="chamber-right">右槽 · 空</span></div>
   <div id="chamber-countdown"></div>
+  <div id="chamber-mutation"></div>
   <div class="chamber-controls">
     <span id="chamber-loaded"></span>
     <button id="chamber-fire" title="向瞄准的槽位投放（G）">投放</button>
@@ -750,6 +751,7 @@ try {
 }
 const {createChamberSystem, CHAMBER_POSITIONS} = await import('./chamber-system.mjs');
 const {createWaterGun} = await import('./water-gun.mjs');
+const {BASE_MUTATION_RATE,normalizedRadiation,createInheritancePlan,resolveInheritancePlan} = await import('./mutation-rate.mjs');
 const {createBonePhysics} = await import('./bone-physics.mjs');
 const {createTripoClient, cloneOffspring, disposeModel} = await import('./tripo-runtime.mjs');
 
@@ -4166,7 +4168,7 @@ const GENE_DEFS = [
 ];
 const GENE_COUNT = GENE_DEFS.length;          // 36（前 32 位见 §1 表，33~36 是附属物）
 const tripoClient = createTripoClient({THREE, GLTFLoader});
-const GENE_MUTATE_P = 0.05;                   // 用户：每个基因位 5% 突变率
+const GENE_MUTATE_P = BASE_MUTATION_RATE;     // Base per-locus probability; full radiation raises it to 25%.
 
 const gi = key => GENE_DEFS.findIndex(d => d.key === key);   // key → 下标（只在定义处用一次）
 const G_BODY = gi('body'), G_BODYCOLOR = gi('bodyColor'), G_BODYTEX = gi('bodyTex'),
@@ -4219,26 +4221,14 @@ function initialGenomeFor(sp) {
    用户规则：
      · 「亲本的基因**各有 50%** 进入子代基因」⇒ **逐位**二选一（不是整段、不是取平均）。
        三种读法的差别很大，我按"逐位"实现 —— 这是**我的判断**，请确认。
-     · 「每个基因位置有 **5% 突变率**」⇒ 每位**独立** 5%（不是整体 5% 概率发生一次）。
+     · 每个可突变基因位独立判定，概率随本轮爱心进度从 5% 线性提升到 25%。
      · 「**整表随机**」⇒ 突变时在该位的**全部档位**里均匀重抽（不是只跳相邻档）。
    ⚠️ 有一个必须自己定的细节：整表随机**有可能抽回原值**，那样会出现
       "系统说'眼睛的有无发生了突变'、但前后一模一样"的观感矛盾。
       ⇒ 这里**保证突变后的值与原值不同**（档位只有 1 个时无法突变，跳过）。
       这是（我的判断），因为"说了突变却看不出变化"比"少突一次"更糟。 */
-function inheritGenome(ga, gb) {
-  const genome = new Array(GENE_COUNT);
-  const mutations = [];
-  for (let i = 0; i < GENE_COUNT; i++) {
-    genome[i] = (Math.random() < 0.5) ? ga[i] : gb[i];
-    if (Math.random() >= GENE_MUTATE_P) continue;
-    const n = GENE_DEFS[i].opts.length;
-    if (n < 2) continue;                       // 只有一档（骨骼）没什么可变
-    let v = genome[i];
-    do { v = Math.floor(Math.random() * n); } while (v === genome[i]);
-    genome[i] = v;
-    mutations.push(GENE_DEFS[i]);
-  }
-  return { genome, mutations };
+function inheritGenome(ga, gb, radiation=0) {
+  return resolveInheritancePlan(GENE_DEFS,createInheritancePlan(GENE_DEFS,ga,gb),radiation);
 }
 
 /* 突变提示：用户原话「告诉玩家**总共突变了哪些性状**，不具体说是什么性状」，
@@ -4327,7 +4317,7 @@ function buildOffspringBody(genome) {
        接生 → 播动画（用户说动画不用我做）→ 得到后代 → **后代进背包**、
        **亲代留在槽位**（可以放回背包，也可以继续留着，都不强制再交配）。
      · 一只帕鲁移进槽位后**就不在背包里**了，要做别的操作必须先放回背包。
-     · 基因在**点击交配时**立即算定，但**不告诉玩家**；接生时才给结果。
+     · 开始时固定每位的继承、突变随机数；辐射后确认概率，再定稿并提交模型生成。
      · 「暂停(Esc) 时不走时间」⇒ 计时只在**未暂停**时累加。
    ============================================================ */
 const BREED_PAIRS = CHAMBER_POSITIONS.length;
@@ -4337,11 +4327,11 @@ let BREED_MS = BREED_MS_DEFAULT;              // &breed=fast / &breed=N only aff
 
 const breeding = {
   slots: new Array(BREED_SLOTS).fill(null),
-  /* 每对一条状态：idle（可交配/可换人）→ running（生成中）→ ready（可接生）→ 接生后回 idle。
-     `genome` / `mutations` / `prompt` 在**点交配时**就写好，但 UI **不显示**（用户要求）。 */
+  /* idle -> irradiating -> running -> ready -> idle; generated genes are immutable after confirmation. */
   pairs: Array.from({ length: BREED_PAIRS }, () => ({
     state: 'idle', ms: 0, genome: null, mutations: [], prompt: '',
     generation: null, model: null, modelInfo: null,
+    inheritancePlan:null,radiation:0,mutationRate:GENE_MUTATE_P,genesLocked:false,
   })),
   result: null,                               // 最近一次接生的结果（给"突变点"提示用）
 };
@@ -4388,28 +4378,47 @@ function pairCanMate(p) {
   return breeding.pairs[p].state === 'idle' && pairReady(p);
 }
 
-/* 算定本轮基因并提交生成；离线时只推进明确标示的演示进度。 */
+/* Prepare one genetic roll per locus, but do not submit a paid generation before radiation is confirmed. */
 function startMate(p) {
   if (!pairCanMate(p)) return false;
   const [i, j] = pairSlots(p);
   const ga = genomeOfPal(breeding.slots[i]);
   const gb = genomeOfPal(breeding.slots[j]);
-  const r = inheritGenome(ga, gb);
   const pr = breeding.pairs[p];
-  pr.genome = r.genome;
-  pr.mutations = r.mutations;                 // 攒着，接生时才说
-  pr.prompt = genomeToPrompt(r.genome);
+  pr.inheritancePlan=createInheritancePlan(GENE_DEFS,ga,gb);
+  pr.radiation=0;pr.mutationRate=GENE_MUTATE_P;pr.genesLocked=false;
   pr.ms = 0;
+  pr.state='irradiating';
+  updateMateRadiation(p,0);
+  blip(700, 0.12, 'triangle', 0.07);
+  return true;
+}
+
+function updateMateRadiation(p,value) {
+  const pr=breeding.pairs[p];
+  if(!pr||pr.state!=='irradiating'||pr.genesLocked||!pr.inheritancePlan)return false;
+  const result=resolveInheritancePlan(GENE_DEFS,pr.inheritancePlan,
+    Math.max(pr.radiation,normalizedRadiation(value)));
+  Object.assign(pr,result);
+  pr.prompt=genomeToPrompt(pr.genome);
+  return true;
+}
+
+function confirmMateRadiation(p,value=breeding.pairs[p]?.radiation) {
+  const pr=breeding.pairs[p];
+  if(!updateMateRadiation(p,value))return false;
+  pr.genesLocked=true;
+  pr.inheritancePlan=null;
   pr.state = 'running';
   if (tripoClient.required) {
     pr.generation = {id:crypto.randomUUID(), genome:pr.genome.slice(), prompt:pr.prompt, status:'submitting', progress:0};
     void generateOffspringModel(pr);
   }
-  blip(700, 0.12, 'triangle', 0.07);
   return true;
 }
 
 function offspringProgress(pr) {
+  if(pr.state==='irradiating')return {percent:0,stage:'irradiating',offline:!tripoClient.required};
   if(!tripoClient.required) {
     const percent=pr.state==='idle'?0:pr.state==='ready'?100:
       BREED_MS>0?Math.min(100,pr.ms/BREED_MS*100):100;
@@ -4443,7 +4452,8 @@ async function generateOffspringModel(pr, resume=false) {
 function abortOffspringGeneration(pr) {
   // User explicitly ends this attempt. A pending remote task stays in the local journal.
   if (pr.model) disposeModel(pr.model, true);
-  Object.assign(pr, {state:'idle', ms:0, genome:null, mutations:[], prompt:'', generation:null, model:null, modelInfo:null});
+  Object.assign(pr, {state:'idle', ms:0, genome:null, mutations:[], prompt:'', generation:null, model:null, modelInfo:null,
+    inheritancePlan:null,radiation:0,mutationRate:GENE_MUTATE_P,genesLocked:false});
 }
 
 function offspringPreview(pr) {
@@ -4498,6 +4508,8 @@ function birthOffspring(p, destination = 'bag') {
     turning: 0, phase: 0, timer: 2,
   });
   ent.genome = pr.genome.slice();
+  ent.mutationRate=pr.mutationRate;
+  ent.radiationProgress=pr.radiation;
   ent.modelTaskId = pr.modelInfo?.taskId || null;
   ent.modelUrl = pr.modelInfo?.modelUrl || null;
   ent.generationPrompt = pr.prompt;
@@ -4508,12 +4520,14 @@ function birthOffspring(p, destination = 'bag') {
   ent.g.visible = false;
   if (destination === 'bag') pals.push(ent);
 
-  breeding.result = { mutations: pr.mutations.slice(), name: form, prompt: pr.prompt };
+  breeding.result = { mutations: pr.mutations.slice(), name: form, prompt: pr.prompt,
+    mutationRate:pr.mutationRate,radiationProgress:pr.radiation };
   pr.state = 'idle';
   pr.ms = 0;
   if (pr.model) disposeModel(pr.model);
   pr.model = null; pr.modelInfo = null; pr.generation = null;
   pr.genome = null; pr.mutations = []; pr.prompt = '';
+  pr.inheritancePlan=null;pr.radiation=0;pr.mutationRate=GENE_MUTATE_P;pr.genesLocked=false;
   blip(920, 0.16, 'sine', 0.08);
   return ent;
 }
@@ -4791,6 +4805,10 @@ chamberSystem = createChamberSystem({
       return true;
     },
     start: () => startMate(p),
+    setRadiation: value => updateMateRadiation(p,value),
+    confirmRadiation: value => confirmMateRadiation(p,value),
+    stopRadiation: () => waterGun?.stop(),
+    mutation: () => ({rate:breeding.pairs[p].mutationRate,locked:breeding.pairs[p].genesLocked}),
     preview: () => offspringPreview(breeding.pairs[p]),
     generation: () => breeding.pairs[p].generation,
     retryGeneration: () => { void generateOffspringModel(breeding.pairs[p], true); },
@@ -4830,9 +4848,10 @@ globalThis.chamberWater = Object.freeze({
 el('water-action').addEventListener('click',()=>chamberSystem.interact());
 function updateWaterAction() {
   const near=chamberSystem.waterNearby!==null;
-  const available=waterGun.equipped?!near:near;
+  const confirm=waterGun.equipped&&chamberSystem.canConfirmRadiation;
+  const available=waterGun.equipped?(!near||confirm):near;
   el('water-action').hidden=!started||paused||bag.open||chamberSystem.cinematic||!available;
-  el('water-action-label').textContent=waterGun.equipped?'收起爱心辐射枪':'领取爱心辐射枪';
+  el('water-action-label').textContent=confirm?'确认生成':waterGun.equipped?'收起爱心辐射枪':'领取爱心辐射枪';
 }
 
 /* 「拾取素材的浮动提示」已随矿/孢子/星岩一起撤掉（element #pick、CSS、flashPick 全删）。 */
