@@ -223,9 +223,11 @@ ok(vacT.captured === true, '目标标记为 captured');
 ok(vacT.g.visible === false, '目标从世界隐藏');
 ok(vacT.g.scale.x < base0 * 1.01, '缩放已复位（' + vacT.g.scale.x.toFixed(2) + '）');
 
-/* 先把顺手吸进来的其它动物放掉，后面的断言只关心我们指定的这一只 */
-while (mag.length > mag0 + 1) { pressKey('KeyG'); for (let i = 0; i < 10; i++) loop(); }
-releaseKey('KeyG');
+/* 先把顺手吸进来的其它动物放掉，后面的断言只关心我们指定的这一只。
+   releaseKey 必须在**循环内**：pressKey 只发 keydown，不松开的话第二轮起就不再发射
+   （发射走"按下边沿"），而这里顺带吸进来几只取决于非种子化的 Math.random —— 
+   以前 releaseKey 写在循环外，只多吸一只时能侥幸退出，多吸两只就死循环。 */
+while (mag.length > mag0 + 1) { pressKey('KeyG'); for (let i = 0; i < 10; i++) loop(); releaseKey('KeyG'); }
 ok(mag.length === mag0 + 1, '清掉顺带吸入的其它动物后，槽里只剩目标（' + mag.length + '）');
 
 const mag1 = mag.length;
@@ -255,7 +257,10 @@ for (let i = 0; i < 120; i++) loop();
 releaseKey('KeyF');
 ok(mag.length === before, '装满后不再吸入（' + before + '）');
 let spitErr = null;
-try { while (mag.length) { pressKey('KeyG'); for (let i = 0; i < 10; i++) loop(); } } catch (e) { spitErr = e; }
+/* 每轮都要 releaseKey：harness 的 pressKey 只发 keydown，而游戏的发射走「按下边沿」
+   （!keyWasDown 才 trySpit）—— 不松开就只发得出第一只，mag.length 永不归零 → 死循环。
+   这个 while 从首个提交起就是这个写法，所以 input.mjs 一直跑不完。 */
+try { while (mag.length) { pressKey('KeyG'); for (let i = 0; i < 10; i++) loop(); releaseKey('KeyG'); } } catch (e) { spitErr = e; }
 ok(!spitErr, '连续吐出无异常' + (spitErr ? '：' + spitErr.message : ''));
 ok(mag.length === 0, '全部吐出后弹夹清空');
 ok(animals.every(a => a.g.visible === true), '所有动物都回到了世界里');

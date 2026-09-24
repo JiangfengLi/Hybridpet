@@ -3257,6 +3257,15 @@ let dragging = false;
 let lockEverWorked = false;   // 指针锁是否曾经拿到过
 let lockFailStreak = 0;
 
+/* ---------- 锁定守卫（防误触退出） ----------
+   escIntentAt：最近一次用户按 Escape 的时刻。用来区分"有意进菜单"和"意外丢锁"。
+   RELOCK_DELAY 必须大于浏览器的 Esc 解锁冷却（Chrome 约 1.25 s），
+   否则抢锁请求会被直接拒绝，反而把玩家推进拖拽兜底模式。 */
+let escIntentAt = -1e9;
+let relockTimer = 0;
+let relockHits = 0;
+const RELOCK_DELAY = 1300;
+
 const el = id => document.getElementById(id);
 const introEl = el('intro'), hudEl = el('hud'), dimEl = el('dim');
 /* 提示条：**保留**（飞行被拒 / 弹夹满 / 屠宰失败 都在用）。
@@ -3324,7 +3333,11 @@ function requestLock(attempt) {
   } catch (e) {
     // 老浏览器不认识 options 参数（同步抛）→ 退回无参调用
     if (attempt === 0) return requestLock(1);
-    return enableDragLook('指针锁不可用');
+    /* 曾经拿到过锁就不降级 —— 这里和 pointerlockerror 那条保持一致。
+       否则：按 Esc 进菜单后，浏览器有约 1.25 s 解锁冷却，玩家在冷却期内点一下画面
+       就会连续失败两次，被永久推进拖拽模式（那个模式没有出口，只能刷新页面）。 */
+    if (!lockEverWorked) enableDragLook('指针锁不可用');
+    return;
   }
 
   if (p && typeof p.catch === 'function') {
@@ -3332,7 +3345,7 @@ function requestLock(attempt) {
     // 所以重试也必须挂 catch，否则兜底模式永远切不过去
     p.catch(() => {
       if (attempt === 0) requestLock(1);
-      else enableDragLook('指针锁被拒绝');
+      else if (!lockEverWorked) enableDragLook('指针锁被拒绝');   // 同上：曾经成功过就不降级
     });
   }
 }
@@ -3343,6 +3356,7 @@ el('startBtn').addEventListener('click', () => {
   started = true;
   paused = false;
   try { initAudio(); } catch (e) { console.warn('[alien-walk] 音频初始化失败：', e); }
+  armNavigationGuard();
   requestLock();
   // 兜底：既没拿到锁、也没收到失败事件 —— 说明浏览器静默拒绝了
   setTimeout(() => {
@@ -3454,6 +3468,11 @@ document.addEventListener('pointerlockchange', () => {
     if (!bag.open && !chamberSystem?.cinematic && !cursorReleased) {
       if (!paused) pointerPauseAt=performance.now();
       pauseGame();
+      /* 同步暂停保持原样，随后判断这是不是"意外丢锁"：
+         用户有意按 Esc 时，Escape keydown 会在几十毫秒内到达并给 escIntentAt 打标，
+         守卫到期后发现该标记就放手 —— 于是"只有 Esc 能进菜单"依旧成立，
+         而 Alt+Tab、点到别的窗口、浏览器自己把锁收走这类误触，会在冷却期后被自动收回。 */
+      scheduleLockGuard();
     }
   }
 });
@@ -3464,6 +3483,81 @@ document.addEventListener('pointerlockerror', () => {
   // 从未成功过（沙箱 iframe、权限被拒）→ 立即切兜底；
   // 曾经成功过（多半是 Esc 退出后的冷却期）→ 放过，让用户再点一次即可
   if (!lockEverWorked && lockFailStreak >= 1) enableDragLook('指针锁被拒绝');
+});
+
+/* ============================================================
+   11.1 锁定守卫 —— 让"放开视角"只剩 Esc 菜单一个入口
+   ------------------------------------------------------------
+   这里必须先说清一条硬约束：**浏览器强制在按 Esc 时释放指针锁**
+   （规范行为，网页无法阻止），而且释放后有约 1.25 s 冷却，
+   期间再请求必被拒。所以做不到"禁止退出"，能可靠做到的是"抢回来"：
+   Esc / 菜单 / 背包 / 演出 / Alt 之外的任何丢锁，都在冷却期后自动收回。
+   ============================================================ */
+/* 只发一次、失败静默的抢锁请求 —— 专供"没有用户手势也敢发起"的自动恢复使用。
+   **绝不能走 requestLock()**：它失败后会立即重试第二次，而第二次失败会命中
+   requestLock 里那两条没做 lockEverWorked 保护的路径 → enableDragLook →
+   把玩家永久推进拖拽模式（那个模式没有任何出口，只能刷新页面）。
+   从 setTimeout / focus 发起的请求本来就可能被 Chrome 拒绝，所以失败就安静算了：
+   兜底交给 pointerlockerror（那里有 lockEverWorked 保护）和玩家自己点一下画面。 */
+function requestLockSoftly() {
+  if (typeof canvas.requestPointerLock !== 'function') return;
+  try {
+    const p = canvas.requestPointerLock({ unadjustedMovement: true });
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch (e) {}
+}
+
+function scheduleLockGuard() {
+  clearTimeout(relockTimer);
+  relockTimer = setTimeout(() => {
+    relockTimer = 0;
+    if (!started || !paused) return;             // 不在暂停态 = 玩家已经自己恢复，不抢
+    if (dragLook || cursorReleased) return;      // 兜底模式 / Alt 主动放出鼠标，尊重现状
+    if (bag.open || chamberSystem?.cinematic) return;
+    if (document.pointerLockElement === canvas) return;
+    if (performance.now() - escIntentAt < RELOCK_DELAY) return;  // 窗口内按过 Esc = 有意进菜单
+    relockHits++;
+    requestLockSoftly();
+  }, RELOCK_DELAY);
+}
+
+/* 鼠标侧键（X1 / X2）与中键：浏览器默认把它们当"后退 / 前进"，
+   会把页面直接带走 —— 游戏没有存档，误触等于全丢，因此一律拦掉。 */
+addEventListener('auxclick', e => {
+  if (e.button === 3 || e.button === 4) { e.preventDefault(); e.stopPropagation(); }
+}, true);
+addEventListener('mousedown', e => {
+  if (e.button === 3 || e.button === 4) { e.preventDefault(); e.stopPropagation(); }
+}, true);
+
+/* 历史哨兵：万一上面没拦住，也不能让页面真的后退走掉，拽回来并给出提示。 */
+let navGuardArmed = false;
+function armNavigationGuard() {
+  if (navGuardArmed) return;
+  navGuardArmed = true;
+  try { history.pushState({ __awGuard: 1 }, ''); } catch (e) {}
+}
+addEventListener('popstate', () => {
+  if (!started) return;
+  try { history.pushState({ __awGuard: 1 }, ''); } catch (e) {}
+  showHint('已拦下浏览器后退 · 想放开鼠标请按 Esc 打开菜单');
+});
+
+/* 误刷新 / 误关标签页：同样因为没有存档，给一次确认的机会。 */
+addEventListener('beforeunload', e => {
+  if (!started) return;
+  e.preventDefault();
+  e.returnValue = '';        // 现代浏览器只看"有没有设 returnValue"
+  return '';
+});
+
+/* 从别的窗口切回来：游戏还在跑就顺手把锁收回来。
+   Chrome 不允许无手势抢锁时请求会静默失败 —— 失败也无妨，点一下画面即可恢复。 */
+addEventListener('focus', () => {
+  if (!started || paused || bag.open || cursorReleased || dragLook) return;
+  if (chamberSystem?.cinematic) return;
+  if (document.pointerLockElement === canvas) return;
+  requestLockSoftly();     // 同上：不能走 requestLock()，否则失败两次会永久降级成拖拽
 });
 
 document.addEventListener('mousemove', e => {
@@ -3491,6 +3585,10 @@ addEventListener('keydown', e => {
   if (e.code==='Escape'&&started) {
     e.preventDefault();
     if (e.repeat) return;
+    /* 用户确实按了 Esc —— 这是"有意退出视角"的唯一入口。
+       立刻打标并撤销守卫，让下面的暂停/恢复拿走控制权。 */
+    escIntentAt = performance.now();
+    clearTimeout(relockTimer); relockTimer = 0;
     // Native pointer-lock Escape may deliver the unlock before this key event.
     if (paused&&performance.now()-pointerPauseAt<180) return;
     if (paused) resumeFromMenu(); else pauseGame();

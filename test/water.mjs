@@ -99,7 +99,12 @@ ok(chamberSystem.cinematic,'ready pod enters the combination presentation');
 chamberSystem.cancel();
 ok(chamberWater.getState(0).value===1,'cancelling a presentation preserves water for this round');
 chamberSystem.interact();
-for(let i=0;i<10;i++)chamberSystem.boost();
+/* 必须"持续按压"到 100%：演出是「按压累加 + 松手衰减」。
+   原来只按 10 次（约 38%）就开跑，进度会一路衰减回 0 →
+   performanceView.done 恒为 false → 出生永远不触发，child 保持 null。
+   写法与 chamber.mjs 里 sustained input 那一段保持一致。 */
+let boostTries=0;
+while(chamberSystem.status(0).performance.progress<1&&boostTries<240){chamberSystem.boost();boostTries++;}
 for(let i=0;i<1600&&chamberSystem.cinematic;i++)step();
 ok(chamberSystem.status(0).phase==='complete','combination completes with a newborn');
 ok(chamberSystem.child.mutationRate===.25&&chamberSystem.child.radiationProgress===1,
