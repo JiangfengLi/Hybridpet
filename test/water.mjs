@@ -40,6 +40,7 @@ animals.filter(a=>!a.captured&&!a.launch).slice(0,4).forEach(captureAnimal);
 for(const id of [0,1]) {
   at(id,0);chamberSystem.fire();at(id,1);chamberSystem.fire();
 }
+at(0);chamberSystem.interact();at(1);chamberSystem.interact();at(0);
 step(40);
 ok(chamberSystem.status(0).view.shakeAmount>.9,'closed incubating pod rocks');
 ok(roots[0].position.x===0&&roots[0].position.z===23,'suspension does not move the collision root');

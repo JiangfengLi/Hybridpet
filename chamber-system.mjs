@@ -15,7 +15,7 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
   const hud=document.getElementById('chamber-hud');
   const $=id=>document.getElementById(id);
   let phase='loading',task=0,sealing=0,child=null,prepared=null,preparedId=0,lastHud='';
-  let lastParents=[null,null],time=0,notice='';
+  let lastParents=[null,null],lastParentHints='',time=0,notice='';
   const water=createWaterCharge({thresholds:waterThresholds,
     onChange:event=>{
       if(event.reason==='spray')host.setRadiation?.(event.value);
@@ -51,6 +51,12 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
       if(lastParents[i]===entity)return;
       view.setParent(i,entity,entity?cloneVisual(entity):null);lastParents[i]=entity;
     });
+    const hints=host.parentHints?.()??[];
+    const signature=hints.join('\n');
+    if(signature!==lastParentHints) {
+      view.setParentHints(hints);
+      lastParentHints=signature;
+    }
   }
   function clearPrepared() {
     prepared?.userData.dispose?.();prepared=null;preparedId=0;
@@ -84,7 +90,7 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
     if(!entity){note('弹夹为空');return true;}
     syncParents();view.shoot(slot,cloneVisual(entity));
     host.sound('deposit');
-    if(host.parents().every(Boolean))startJob();
+    if(host.parents().every(Boolean))note('两只亲代已就位 · 按 E 确认结合');
     return true;
   }
   function collect() {
@@ -129,7 +135,9 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
     if(phase==='irradiating')return confirmRadiation();
     if(phase==='error'){host.retryGeneration();phase='generating';notice='';return true;}
     if(phase==='loading') {
-      if(!startJob())note('等待两只亲代');
+      if(host.parents().every(Boolean)) {
+        if(!startJob())note('等待两只亲代');
+      } else note('等待两只亲代');
       return true;
     }
     if(phase==='ready') {
@@ -199,7 +207,9 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
       lastHud=state;hud.dataset.phase=phase;
       hud.dataset.chamber=String(id);
       $('chamber-name').textContent='GENESIS / '+String(id+1).padStart(2,'0');
-      $('chamber-phase').textContent=({loading:'等待亲代',sealing:'舱门密封',irradiating:'爱心辐射',generating:'孕育中',error:'孕育暂时中断',ready:'可以结合',playing:'结合中',complete:'新生命诞生'})[phase];
+      const parentsReady=parents.every(Boolean);
+      $('chamber-phase').textContent=phase==='loading'&&parentsReady?'等待确认结合':
+        ({loading:'等待亲代',sealing:'舱门密封',irradiating:'爱心辐射',generating:'孕育中',error:'孕育暂时中断',ready:'可以结合',playing:'结合中',complete:'新生命诞生'})[phase];
       $('chamber-left').textContent=parents[0]?.species.name||'左槽 · 空';
       $('chamber-right').textContent=parents[1]?.species.name||'右槽 · 空';
       $('chamber-left').classList.toggle('aimed',aimed===0);
@@ -208,6 +218,7 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
       const modelStatus=progress.offline?'离线演示':({submitting:'提交中',queued:'排队中',running:'模型生成',
         downloading:'模型下载中',loading:'模型载入中',ready:'模型已就绪',error:'生成中断'})[progress.stage]||'模型生成';
       $('chamber-countdown').textContent=phase==='error'?generation?.error||'模型生成中断':
+        phase==='loading'&&parentsReady?'亲代已就位 · 按 E 确认结合':
         phase==='irradiating'?'等待确认生成':
         ['sealing','generating','ready'].includes(phase)?modelStatus+' · '+Math.floor(progress.percent)+'%':
         phase==='complete'?child?.species.name||'':progress.offline?'离线演示':'';
@@ -218,7 +229,7 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
       $('chamber-suck').disabled=equipped||phase!=='error'&&phase!=='complete'&&(phase!=='loading'||![0,1].includes(aimed)||!parents[aimed]);
       $('chamber-interact').disabled=!canConfirm&&!canEquip&&!canStow&&!['ready','complete','error'].includes(phase)&&!(phase==='loading'&&parents.every(Boolean));
       $('chamber-interact').textContent=phase==='irradiating'?'确认生成':canStow?'收起爱心辐射枪 · E':canEquip?'领取爱心辐射枪 · E':phase==='error'?(generation?.submission_status==='rejected'?'重试提交':generation?.submission_status==='unconfirmed'?'核对后重试':'继续查询 / 加载'):
-        phase==='complete'?'收下后代':phase==='loading'?'再次孕育':
+        phase==='complete'?'收下后代':phase==='loading'&&parentsReady?'确认结合':phase==='loading'?'再次孕育':
         phase==='sealing'?'舱门密封中':phase==='generating'?'模型生成中':'开始结合';
     }
   }
@@ -274,6 +285,7 @@ export function createChamberSystem({THREE,scene,camera,player,host,waterThresho
     onStart:()=>hosts[owner].setCinematic(true),
     onBirth:()=>hosts[owner].celebrate?.(),
     isMuted:hosts[0].isMuted,toggleSound:hosts[0].toggleSound,effectsVolume:hosts[0].effectsVolume,
+    musicVolume:hosts[0].musicVolume,
   });
   pods=CHAMBER_POSITIONS.map((position,id)=>createPod({
     THREE,scene,camera,player,host:hosts[id],id,position,performanceView,cinematic,waterThresholds,emitWater,

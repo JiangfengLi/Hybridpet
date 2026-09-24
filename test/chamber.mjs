@@ -27,6 +27,13 @@ console.log('ok   session: 10 inputs, 4 unique contacts, reset');
 await runGame(`
 ${DRIVER_HEAD}
 sec('Capsule lifecycle, replay, capacity and ownership');
+globalThis.Audio=class {
+  constructor(src){this.src=src;this.paused=true;this.currentTime=0;this.plays=0;}
+  addEventListener(){}
+  play(){this.plays++;this.paused=false;return Promise.resolve();}
+  pause(){this.paused=true;}
+};
+initAudio();
 const step = (n=1) => { for(let i=0;i<n;i++)chamberSystem.tick(1/60); };
 const aim = slot => {
   camera.position.set(player.x,EYE,player.z);
@@ -39,6 +46,7 @@ const fingerprint = a => {
   return JSON.stringify(meshes);
 };
 const parents=['slime-ring','slime-ball'].map(key=>animals.find(a=>a.species.key===key));
+const initialAnimalCount=animals.length;
 const original=parents.map(fingerprint);
 parents.forEach(captureAnimal);
 aim(0);
@@ -50,8 +58,12 @@ ok(chamberSystem.suck()&&mag.includes(parents[0])&&!breeding.slots[0], 'idle par
 // Restore known FIFO order after withdrawal.
 mag.splice(mag.indexOf(parents[0]),1);mag.unshift(parents[0]);
 chamberSystem.fire();aim(1);chamberSystem.fire();
+ok(chamberSystem.status().phase==='loading'&&!chamberSystem.status().view.closed
+  &&!chamberSystem.status().view.incubating, 'two parents wait in the open capsule');
+ok(chamberSystem.status().view.parentHints, 'parent gene hints appear between the parents');
+ok(chamberSystem.interact()&&chamberSystem.status().phase==='sealing',
+  'confirm interaction starts sealing');
 const planned=JSON.stringify(breeding.pairs[0].genome);
-ok(chamberSystem.status().phase==='sealing', 'two parents auto start the task');
 ok(chamberSystem.suck()&&breeding.slots.slice(0,2).every(Boolean), 'sealed parent cannot be withdrawn');
 ok(!birthOffspring(0,'chamber'), 'cannot birth before incubation is ready');
 step(120);
@@ -81,27 +93,42 @@ ok(chamberSystem.status().phase==='ready'&&chamberSystem.status().view.closed
 ok(!chamberSystem.status().view.incubating&&!podLoop.visible,
   'countdown completion ends the window loop and retains the existing ready flow');
 ok(chamberSystem.interact()&&chamberSystem.cinematic, 'ready task starts presentation');
+ok(chamberSystem.status().performance.state==='cinematic'&&chamberSystem.status().performance.progress===0,
+  'ready task enters the new progress stage directly without QTE or a second parent selector');
+backgroundTrack.media.currentTime=12;
+syncGameAudio();
+ok(backgroundTrack.media.paused&&backgroundTrack.media.currentTime===12,
+  'fusion BGM has the stage to itself while world music retains its position');
 chamberSystem.boost();
-const t=chamberSystem.status().performance.time;
+const t=chamberSystem.status().performance.cinematicTime;
 el('fusion-pause').onclick();step(30);
-ok(chamberSystem.status().performance.time===t, 'presentation pause stops animation time');
+ok(chamberSystem.status().performance.cinematicTime===t, 'presentation pause stops animation time');
 el('fusion-pause').onclick();step(4);
-ok(chamberSystem.status().performance.time>t, 'presentation resumes');
+ok(chamberSystem.status().performance.cinematicTime>t, 'presentation resumes');
 el('fusion-replay').onclick();
 ok(chamberSystem.status().performance.presses===0, 'replay resets presses');
 ok(JSON.stringify(breeding.pairs[0].genome)===planned, 'replay preserves genetics');
 ok(chamberSystem.cancel()&&chamberSystem.status().phase==='ready', 'return retains ready task');
-ok(animals.length===40, 'return does not register a child');
+ok(animals.length===initialAnimalCount, 'return does not register a child');
 chamberSystem.interact();
-for(let i=0;i<10;i++)chamberSystem.boost();
+let attempts=0;
+while(chamberSystem.status().performance.progress<1&&attempts<240) {
+  chamberSystem.boost();attempts++;
+}
+ok(chamberSystem.status().performance.progress===1, 'progress reaches 100% with sustained input');
 const phases=new Set();
 for(let i=0;i<1600&&chamberSystem.cinematic;i++) {
   step();phases.add(chamberSystem.status().performance.cinematicPhase);
 }
-for(const phase of ['drawing','weaving','coiling','separating','birth','result'])
+for(const phase of ['birth','result'])
   ok(phases.has(phase),'full film contains '+phase);
+ok(birthTrack.media.src==='./assets/birth-mama.wav'&&birthTrack.media.plays===1,
+  'new fusion birth plays the original mama cue exactly once');
+syncGameAudio();
+ok(!backgroundTrack.media.paused&&backgroundTrack.media.currentTime===12,
+  'returning from fusion resumes world music without restarting it');
 const baby=chamberSystem.child;
-ok(!!baby&&animals.length===41, 'one child registered after full film');
+ok(!!baby&&animals.length===initialAnimalCount+1, 'one child registered after full film');
 ok(JSON.stringify(baby.genome)===planned, 'birth uses the precomputed genome');
 ok(baby.species.speed===.62&&baby.g.userData.speed===.62, 'inherited movement speed applied');
 ok(baby.captured&&!baby.g.visible&&!mag.includes(baby)&&!pals.includes(baby), 'child is safely held by capsule before claiming');
@@ -109,7 +136,7 @@ step(120);
 ok(chamberSystem.status().view.openness===1, 'capsule reopens');
 ok(!podLoop.visible&&!chamberSystem.status().view.incubating,
   'reopened capsule does not continue the combination loop');
-ok(animals.length===41, 'subsequent frames do not duplicate birth');
+ok(animals.length===initialAnimalCount+1, 'subsequent frames do not duplicate birth');
 const count=chamberSystem.status().task;
 mag.length=0;pals.length=0;
 for(let i=0;i<MAG_MAX;i++)mag.push({species:{name:'capacity fixture'}});
@@ -118,7 +145,7 @@ ok(!chamberSystem.collect()&&chamberSystem.child===baby, 'full inventory does no
 ok(chamberSystem.status().phase==='complete', 'full capacity keeps claimable state');
 pals.pop();
 ok(chamberSystem.collect()&&pals.includes(baby)&&!mag.includes(baby), 'full magazine falls back to backpack');
-ok(!chamberSystem.collect()&&animals.length===41, 'repeat claim has no side effects');
+ok(!chamberSystem.collect()&&animals.length===initialAnimalCount+1, 'repeat claim has no side effects');
 ok(breeding.slots.slice(0,2).every(Boolean), 'parents retained after collection');
 parents.forEach((p,i)=>ok(fingerprint(p)===original[i], 'original parent geometry unchanged '+i));
 mag.length=0;pals.length=0;pals.push(baby);
@@ -128,7 +155,7 @@ ok(breeding.slots.every(x=>!x)&&parents.every(p=>mag.includes(p)), 'parents can 
 magToBag(0);magToBag(0);
 bagToMag(pals.indexOf(baby));
 bagToMag(pals.indexOf(parents[0]));
-aim(0);chamberSystem.fire();aim(1);chamberSystem.fire();
+aim(0);chamberSystem.fire();aim(1);chamberSystem.fire();chamberSystem.interact();
 ok(breeding.slots[0]===baby, 'offspring can become a parent');
 ok(chamberSystem.status().task===count+1, 'next generation has a new task');
 /* ⚠️ 长度这里原来写死 32 —— 加附属物（33~36 位）之后必然失配。

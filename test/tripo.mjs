@@ -112,6 +112,7 @@ parents.forEach(captureAnimal);
 for(let id=0;id<3;id++) {
   at(id,0);chamberSystem.fire();
   at(id,1);chamberSystem.fire();
+  at(id);chamberSystem.interact();
   step(90);chamberSystem.confirmRadiation();
 }
 ok(calls.length===3&&new Set(calls.map(call=>call.job.id)).size===3,
@@ -153,7 +154,8 @@ plans[1]=JSON.stringify(breeding.pairs[1].genome);
 resolveModel(calls[4],1);await tick();breedAdvance(BREED_MS);step(120);
 for(const id of [2,0,1]) {
   at(id);chamberSystem.interact();
-  for(let i=0;i<10;i++)chamberSystem.boost();
+  for(let i=0;i<100&&chamberSystem.status(id).performance.progress<1;i++)chamberSystem.boost();
+  ok(chamberSystem.status(id).performance.progress===1,'generated model presentation completes its progress bar '+id);
   for(let i=0;i<1600&&chamberSystem.cinematic;i++)step();
   const baby=chamberSystem.child;
   ok(chamberSystem.status(id).phase==='complete'&&baby?.modelTaskId==='remote-pod-'+id,

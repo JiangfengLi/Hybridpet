@@ -3664,8 +3664,8 @@ function syncGameAudio() {
     }
   }
   // Music stays audible in the volume menu; world effects and animation remain paused.
-  syncAudioTrack(backgroundTrack,started&&!document.hidden,
-    (chamberSystem?.cinematic ? .14 : .32)*channelVolume('background'));
+  syncAudioTrack(backgroundTrack,started&&!document.hidden&&!chamberSystem?.cinematic,
+    .32*channelVolume('background'));
   const moving=running&&!bag.open&&!debugStill&&!chamberSystem?.cinematic;
   if(!moving)waterGun?.stop();
   syncAudioTrack(grassTrack,moving&&groundMoving&&!player.flying,.55*effectsVolume,true);
@@ -4266,6 +4266,8 @@ function mutationLines(mutations) {
   return mutations.map(d => d.say + '发生了突变！！！');
 }
 
+const TRIPO_STYLE_PROMPT = '[主体], in the art style of Spore (2008 video game), cartoon sci-fi, stylized 3D, vibrant saturated colors, rounded low-poly shapes, smooth shading, exaggerated proportions, big expressive eyes, cute grotesque alien creature, clean minimal textures, soft lighting, playful whimsical tone, 2000s Maxis/EA CGI, alien planet, evolution game aesthetic, high quality render';
+
 /* ---------- 基因 → 提示词 ----------
    用户：「后代基因用于生成提示词，给 tripo3D api 生成模型。」
    ⚠️ 提示词的**措辞是我的初版**（用户只说了"用于生成提示词"，没给文案）。
@@ -4276,6 +4278,8 @@ function genomeToPrompt(g) {
   const v = i => GENE_DEFS[i].opts[g[i]];
   const has = i => v(i) === '有';
   const parts = [];
+  parts.push(TRIPO_STYLE_PROMPT.replace('[主体]',
+    'A single ' + v(G_BODYFORM) + ' alien pet with ' + v(G_BODYCOLOR) + ' body color and ' + v(G_BODYTEX) + ' texture'));
   parts.push('单只 3D 卡通外星宠物，低多边形、圆润、适合实时渲染，无骨骼静态网格。');
   parts.push('主体形态：' + v(G_BODYFORM) + '；体型：' + v(G_BODY) + '；' +
              '主体颜色：' + v(G_BODYCOLOR) + '；主体质感：' + v(G_BODYTEX) + '。');
@@ -4572,6 +4576,28 @@ function genomeOfPal(a) {
   return _initialGenomeCache.get(k);
 }
 
+/* Keep the in-capsule hint short: it previews inherited traits without exposing
+   the full generated prompt or the future offspring genome. */
+function parentTraitHint(a,label) {
+  if (!a) return '';
+  const g=genomeOfPal(a),v=i=>GENE_DEFS[i].opts[g[i]],traits=[
+    v(G_BODYFORM),'体型'+v(G_BODY),v(G_BODYCOLOR),v(G_BODYTEX)];
+  const parts=[
+    ['eyeOn','eyeColor','eyeForm','眼睛'],
+    ['earOn','earColor','earForm','耳朵'],
+    ['hornOn','hornColor','hornForm','角冠'],
+    ['wingOn','wingColor','wingForm','翅膀'],
+    ['tailOn','tailColor','tailForm','尾巴'],
+    ['limbOn','limbColor','limbForm','四肢'],
+  ];
+  for(const [on,color,form,name] of parts) {
+    if(v(gi(on))==='有') traits.push(name+'·'+v(gi(color))+'·'+v(gi(form)));
+  }
+  const accessories=attachListOf(g);
+  if(accessories.length)traits.push('附属物·'+accessories.join('、'));
+  return label+'：'+a.species.name+' · '+traits.slice(0,5).join(' · ');
+}
+
 /* 背包/槽位格子上显示的"体型"。
    ⚠️ 从 `baseScale`（原来是 ×0.70~1.00 的标量）改成**体型档位字母**：
       体型制式化之后所有个体都是 1.00，那个小数已经没有信息量了
@@ -4792,6 +4818,9 @@ chamberSystem = createChamberSystem({
   THREE, scene, camera, player,
   host: p => ({
     parents: () => breeding.slots.slice(p*2,p*2+2),
+    parentHints: () => breeding.slots.slice(p*2,p*2+2)
+      .map((parent,index) => parentTraitHint(parent,index===0?'亲代 A':'亲代 B'))
+      .filter(Boolean),
     job: () => breeding.pairs[p],
     remaining: () => Math.max(0, BREED_MS - breeding.pairs[p].ms),
     progress: () => offspringProgress(breeding.pairs[p]),
@@ -4849,6 +4878,7 @@ chamberSystem = createChamberSystem({
     notice: text => showToast(text, 'GENESIS / '+String(p+1).padStart(2,'0')),
     isMuted: () => muted,
     effectsVolume: () => channelVolume('effects'),
+    musicVolume: () => channelVolume('background'),
     celebrate: playBirthCelebration,
     toggleSound: toggleMute,
     setCinematic(value) {

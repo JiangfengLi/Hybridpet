@@ -31,9 +31,13 @@ for(let id=0;id<3;id++) {
   at(id,1);ok(chamberSystem.fire(),'deposit second parent at pod '+id);
   ok(breeding.slots[id*2]===parents[id*2]&&breeding.slots[id*2+1]===parents[id*2+1],
     'parent ownership stays with pod '+id);
-  plans.push(JSON.stringify(breeding.pairs[id].genome));
+  ok(chamberSystem.status(id).phase==='loading'&&!chamberSystem.status(id).view.closed
+    &&chamberSystem.status(id).view.parentHints,'pod '+id+' waits open with parent hints');
+  at(id);ok(chamberSystem.interact()&&chamberSystem.status(id).phase==='sealing',
+    'confirm interaction seals pod '+id);
   step(90);
   ok(chamberSystem.confirmRadiation(),'confirm generation for pod '+id);
+  plans.push(JSON.stringify(breeding.pairs[id].genome));
   if(id<2)breedAdvance(500);
 }
 ok(mag.length===0&&new Set(breeding.slots).size===6,'six distinct parents leave the magazine once');
@@ -69,7 +73,11 @@ const initialCount=animals.length;
 for(const id of [1,0,2]) {
   at(id);chamberSystem.interact();
   ok(chamberSystem.status().id===id&&chamberSystem.cinematic,'start correct pod '+id);
-  for(let j=0;j<10;j++)chamberSystem.boost();
+  let attempts=0;
+  while(chamberSystem.status(id).performance.progress<1&&attempts<240) {
+    chamberSystem.boost();attempts++;
+  }
+  ok(chamberSystem.status(id).performance.progress===1,'pod '+id+' progress reaches 100%');
   for(let j=0;j<1600&&chamberSystem.cinematic;j++)step();
   const baby=chamberSystem.child;
   ok(chamberSystem.status(id).phase==='complete'&&!!baby,'finish correct pod '+id);

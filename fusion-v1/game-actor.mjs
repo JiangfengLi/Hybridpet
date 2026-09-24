@@ -33,7 +33,7 @@ function snapshot(source,height=2.15) {
   }};
 }
 
-export function createGameActor(source,{side=0,modelId}={}) {
+export function createGameActor(source,{side=0,modelId,initialWave=true}={}) {
   const asset=snapshot(source);
   const deformers=asset.meshes.map(mesh=>{
     const yaw=modelId==='tripotest1'?-Math.PI/2:Math.PI;
@@ -51,7 +51,7 @@ export function createGameActor(source,{side=0,modelId}={}) {
       geometry.computeVertexNormals();geometry.computeBoundingBox();geometry.computeBoundingSphere();
     });
   };
-  asset.applySections(waveSections(sampleWave(0).points));
+  if(initialWave)asset.applySections(waveSections(sampleWave(0).points));
   const largest=[...asset.meshes].sort((a,b)=>{
     const volume=m=>{m.geometry.computeBoundingBox();const s=m.geometry.boundingBox.getSize(new THREE.Vector3());return s.x*s.y*s.z;};
     return volume(b)-volume(a);

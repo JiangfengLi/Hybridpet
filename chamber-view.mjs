@@ -127,6 +127,38 @@ export function createChamberView(THREE, scene, camera, {position=CHAMBER_POSITI
   interiorLight.position.set(0,3.75,-1.45);body.add(interiorLight);
   const frontMark=sign('GENESIS '+String(id+1).padStart(2,'0'),1.8,.27,0,.83,-2.679);
   const screen=sign('STANDBY',1.58,.24,0,1.15,-2.691,'#526c77','#ecf5ee');
+  const hintCanvas=document.createElement('canvas');hintCanvas.width=1024;hintCanvas.height=192;
+  const hintContext=hintCanvas.getContext('2d');
+  const hintTexture=new THREE.CanvasTexture(hintCanvas);hintTexture.colorSpace=THREE.SRGBColorSpace;
+  textures.push(hintTexture);
+  const hintMaterial=new THREE.MeshBasicMaterial({map:hintTexture,transparent:true,depthWrite:false});
+  materials.push(hintMaterial);
+  const parentHints=mesh(new THREE.PlaneGeometry(3.25,.58),hintMaterial);
+  parentHints.name='pod-parent-hints';parentHints.position.set(0,2.48,-2.29);parentHints.rotation.y=Math.PI;
+  parentHints.visible=false;
+  let hintSignature='',hasParentHints=false;
+  function drawParentHints(lines) {
+    const values=Array.isArray(lines)?lines.slice(0,2).map(value=>String(value||'')): [];
+    const signature=values.join('\n');
+    if(signature===hintSignature)return;
+    hintSignature=signature;
+    hintContext.clearRect(0,0,1024,192);
+    hasParentHints=values.length>=2;
+    if(values.length<2) {
+      parentHints.visible=false;
+      hintTexture.needsUpdate=true;
+      return;
+    }
+    hintContext.fillStyle='rgba(38,61,66,.86)';
+    hintContext.fillRect(12,12,1000,168);
+    hintContext.fillStyle='#effcf5';
+    hintContext.textAlign='center';hintContext.textBaseline='middle';
+    hintContext.font='600 32px "Segoe UI","Microsoft YaHei",sans-serif';
+    values.forEach((value,index)=>hintContext.fillText(value,512,62+index*68));
+    parentHints.visible=hasParentHints;
+    hintTexture.needsUpdate=true;
+  }
+  drawParentHints([]);
   rounded(5.4,.57,.12,.035,0,1.84,-2.62,dark);
   const waterCanvas=document.createElement('canvas');waterCanvas.width=1024;waterCanvas.height=96;
   const waterContext=waterCanvas.getContext('2d');
@@ -221,6 +253,7 @@ export function createChamberView(THREE, scene, camera, {position=CHAMBER_POSITI
   }
   function update(dt,time,phase,{progress=0,water=0,offline=false}={}) {
     const open=['loading','complete'].includes(phase);
+    parentHints.visible=phase==='loading'&&hasParentHints;
     openness+=Math.sign((open?1:0)-openness)*Math.min(Math.abs((open?1:0)-openness),dt*1.25);
     const ease=openness*openness*(3-2*openness);
     lidPivot.rotation.x=ease*1.12;
@@ -289,9 +322,10 @@ export function createChamberView(THREE, scene, camera, {position=CHAMBER_POSITI
     if(x-Math.abs(dx)<z-Math.abs(dz))body.x=root.position.x+Math.sign(dx||1)*x;
     else body.z=root.position.z+Math.sign(dz||-1)*z;
   }
-  return {root,setParent,setChild,aim,hit,waterHit,shoot,update,constrain,
+  return {root,setParent,setParentHints:drawParentHints,setChild,aim,hit,waterHit,shoot,update,constrain,
     status(){return {openness,closed:openness<=.001,opaque:false,observationWindow:true,windowCount:windows.length,
-      incubating:incubationRoot.visible,incubationTime,flight:!!flight,shakeAmount,waterPercent,progress:lastProgress};},
+      incubating:incubationRoot.visible,incubationTime,flight:!!flight,shakeAmount,waterPercent,
+      progress:lastProgress,parentHints:parentHints.visible};},
     dispose(){slots.forEach(s=>{s.actor?.dispose();s.visual?.userData.dispose?.();});child?.userData.dispose?.();flight?.visual.userData.dispose?.();
       flight?.visual.removeFromParent();root.removeFromParent();geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());}
   };

@@ -15,7 +15,8 @@ import urllib.request
 import uuid
 
 BASE = "https://api.tripo3d.ai/v2/openapi"
-SKILL_DIR = Path(__file__).resolve().parents[1]
+# Resolve bundled defaults from this project, not its parent directory.
+SKILL_DIR = Path(__file__).resolve().parent
 MODELS = ("v3.1-20260211", "P1-20260311")
 FORMATS = ("FBX", "OBJ", "STL", "GLTF", "USDZ", "3MF")
 

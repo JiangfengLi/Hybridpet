@@ -49,7 +49,7 @@ for(let id=0;id<3;id++) {
 }
 ok(calls.length===0,'sealed pairs do not create early API tasks');
 step(40);
-at(0);chamberSystem.interact();
+at(0);chamberSystem.interact();step(40);chamberSystem.interact();
 const origin=new THREE.Vector3(0,2.7,14),direction=new THREE.Vector3(0,0,1);
 for(let i=0;i<100;i++)chamberSystem.sprayWater(origin,direction,1/12,12);
 const pair=breeding.pairs[0];
@@ -65,6 +65,8 @@ ok(calls.length===1&&pair.genesLocked&&pair.state==='running',
   'E while equipped confirms current progress and submits exactly once');
 ok(JSON.stringify(calls[0].job.genome)===halfGenome&&calls[0].job.prompt===genomeToPrompt(pair.genome),
   'API receives the finalized genes and matching prompt');
+ok(calls[0].job.prompt.includes('in the art style of Spore (2008 video game)'),
+  'API prompt includes the requested art direction');
 for(let i=0;i<100;i++)chamberSystem.sprayWater(origin,direction,.1,12);
 ok(JSON.stringify(pair.genome)===halfGenome&&calls.length===1,
   'post-confirmation hits cannot alter genes or resubmit');
@@ -80,10 +82,12 @@ ok(baby&&Math.abs(baby.mutationRate-.15)<1e-10&&JSON.stringify(baby.genome)===ha
   'offspring retains the actual probability and immutable generated genes');
 ok(pair.radiation===0&&pair.mutationRate===.05&&!pair.genesLocked,'next round starts without inherited bonus');
 at(1);origin.x=CHAMBER_POSITIONS[1].x;
+chamberSystem.interact();chamberSystem.interact();step(40);chamberSystem.interact();
 for(let i=0;i<170;i++)chamberSystem.sprayWater(origin,direction,.1,12);
 ok(breeding.pairs[1].mutationRate===.25&&breeding.pairs[1].genesLocked&&calls.length===3,
   'full radiation automatically submits once at 25 percent');
-at(2);fire('chamber-interact','click');
+at(2);chamberSystem.interact();chamberSystem.interact();step(40);
+chamberSystem.interact();chamberSystem.interact();
 ok(calls.length===4&&breeding.pairs[2].mutationRate===.05,
   'HUD allows explicit generation at zero radiation without changing its genes');
 const pending=calls[2].job;

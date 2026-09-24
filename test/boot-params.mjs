@@ -178,8 +178,12 @@ for (const x of [1.64, -1.64]) {
   pressKey('KeyG'); releaseKey('KeyG');
 }
 ok(mag.length === 0 && breeding.slots.slice(0,2).every(Boolean), 'G 将弹夹首项分别投入第一座舱的两槽');
-ok(chamberSystem.status().phase === 'sealing', '第二只投入后自动密封');
-ok(!!breeding.pairs[0].genome, '开始时准备本轮基因候选');
+ok(chamberSystem.status().phase === 'loading'&&!chamberSystem.status().view.closed,
+  '第二只投入后仍保持开放');
+ok(chamberSystem.status().view.parentHints, '开放舱体显示双方基因提示');
+pressKey('KeyE'); releaseKey('KeyE');
+ok(chamberSystem.status().phase === 'sealing', '确认交互后才开始密封');
+ok(!!breeding.pairs[0].genome, '确认后准备本轮基因候选');
 const planned = breeding.pairs[0].genome.slice();
 for (let i = 0; i < 30; i++) chamberSystem.tick(.05);
 ok(chamberSystem.status().phase==='irradiating','密封后进入辐射阶段');
@@ -196,7 +200,13 @@ ok(!bag.open, '演出期间不能打开背包');
 fireKey('keydown', 'Space', {repeat:true});
 ok(chamberSystem.status().performance.presses === 0, '键盘长按不计数');
 for (let i = 0; i < 10; i++) { pressKey('Space'); releaseKey('Space'); }
-ok(chamberSystem.status().performance.state === 'surge', '十次空格后进入强化');
+ok(chamberSystem.status().performance.state === 'cinematic'
+  &&chamberSystem.status().performance.progress>0&&chamberSystem.status().performance.progress<1,
+  '十次空格仅增加融合进度，不进入旧强化阶段');
+for(let i=0;i<100&&chamberSystem.status().performance.progress<1;i++) {
+  pressKey('Space');releaseKey('Space');
+}
+ok(chamberSystem.status().performance.progress===1,'持续按键填满进度后才开始新生');
 for (let i = 0; i < 1600 && chamberSystem.cinematic; i++) chamberSystem.tick(1/60);
 ok(chamberSystem.status().phase === 'complete', '完整影片后才结束');
 const baby = chamberSystem.child;

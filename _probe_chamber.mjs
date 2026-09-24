@@ -28,6 +28,8 @@
  * 覆盖不到的（如实）：触摸屏、真实手柄、以及"标签页被切走"这种环境态（那正是本探针
  * 要排除的变量，只能由人复现）。
  */
+// The header above records the retired QTE probe. The current probe below tests
+// progressive disco fusion and defaults to the built offline file (no paid API).
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -40,8 +42,10 @@ const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
        ψ(slot0) = atan2(−1.64, −9.0) = −2.9612，θ = asin(0.92/9.182) = 0.1004
      转向 slot1 需要 Δψ = +5.9224，而 `player.yaw -= movementX * 0.0021`
      ⇒ movementX = −5.9224 / 0.0021 = −2820。 */
+// Default to the built offline release: verification must not submit paid jobs.
 const URL_ = process.argv[2] ||
-  'http://127.0.0.1:8791/index.html?autostart=1&intro=0&pos=0,14&mag=2&breed=fast&yaw=-2.9612&pitch=0.1004';
+  new URL('./alien-walk-standalone.html',import.meta.url).href+
+  '?autostart=1&intro=0&pos=0,14&mag=2&breed=fast&yaw=-2.9612&pitch=0.1004';
 const TURN_TO_SLOT1 = -2820;
 const PORT = 9500 + (process.pid % 90);
 const PROFILE = path.join(os.tmpdir(), 'alwk-chamber-' + process.pid);
@@ -63,7 +67,17 @@ const chrome = spawn(CHROME, [
   URL_,
 ], { stdio: ['ignore', 'ignore', 'ignore'] });
 
-const die = async (code) => { try { chrome.kill(); } catch {} await sleep(250); try { fs.rmSync(PROFILE, { recursive: true, force: true }); } catch {} process.exit(code); };
+const die = async (code) => {
+  try { chrome.kill(); } catch {}
+  await sleep(250);
+  if(path.dirname(path.resolve(PROFILE))===path.resolve(os.tmpdir())&&
+    path.basename(PROFILE)==='alwk-chamber-'+process.pid) {
+    try { fs.rmSync(PROFILE, { recursive: true, force: true }); } catch {}
+  }
+  process.exit(code);
+};
+process.on('uncaughtException',error=>{console.error(error);void die(1);});
+process.on('unhandledRejection',error=>{console.error(error);void die(1);});
 
 let target = null;
 for (let i = 0; i < 120; i++) {
@@ -108,6 +122,50 @@ const status = async () => JSON.parse(await evalJS('JSON.stringify(__chamberStat
 await send('Runtime.enable');
 await send('Page.enable');
 await send('Log.enable');
+await send('Network.enable');
+await send('Page.addScriptToEvaluateOnNewDocument',{source:`
+  window.__probeBirthPlays=0;
+  window.__probeFusionAudio={music:0,press:0};
+  const oscillator=AudioContext.prototype.createOscillator;
+  AudioContext.prototype.createOscillator=function() {
+    const node=oscillator.apply(this,arguments),start=node.start;
+    const setFrequency=node.frequency.setValueAtTime;
+    let pitch=0;
+    node.frequency.setValueAtTime=function(value,time) {
+      pitch=value;return setFrequency.call(this,value,time);
+    };
+    node.start=function() {
+      if([261.63,311.13,392,466.16,233.08].includes(pitch))window.__probeFusionAudio.music++;
+      if(pitch>148&&pitch<220)window.__probeFusionAudio.press++;
+      return start.apply(this,arguments);
+    };
+    return node;
+  };
+  const play=HTMLMediaElement.prototype.play;
+  HTMLMediaElement.prototype.play=function() {
+    const embedded=document.getElementById('__birth_audio')?.textContent.trim();
+    if(this.src.endsWith('/birth-mama.wav')||(embedded&&this.src.endsWith(embedded))) {
+      window.__probeBirthPlays++;
+    }
+    return play.apply(this,arguments);
+  };
+`});
+await send('Page.reload');
+const screenshot=async name=>{
+  const result=await send('Page.captureScreenshot',{format:'png'});
+  const directory=new URL('./output/',import.meta.url);
+  fs.mkdirSync(directory,{recursive:true});
+  fs.writeFileSync(new URL(name,directory),Buffer.from(result.result.data,'base64'));
+};
+const canvasColors=()=>evalJS(`new Promise(resolve=>requestAnimationFrame(()=>{
+  const canvas=document.getElementById('app'),gl=canvas.getContext('webgl2');
+  if(!gl){resolve(0);return;}
+  const w=gl.drawingBufferWidth,h=gl.drawingBufferHeight,pixels=new Uint8Array(w*h*4);
+  gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+  const colors=new Set();
+  for(let i=0;i<pixels.length;i+=1024)colors.add(pixels[i]+','+pixels[i+1]+','+pixels[i+2]);
+  resolve(colors.size);
+}))`);
 {
   const t0 = Date.now();
   while (Date.now() - t0 < 90000) { if (await evalJS('!!window.__gameBooted')) break; await sleep(300); }
@@ -158,22 +216,34 @@ sec('C. 转视角到另一个槽位，再投一只（合成 MouseEvent 只用于
   const s2 = await status();
   console.log('  转向后再按 G：slots=' + JSON.stringify(s2.slots) + '  phase=' + s2.phase);
   ok(s2.slots.every(Boolean), '两槽都放好亲代');
-  ok(s2.phase === 'sealing', '两只就位后自动开始密封（phase=' + s2.phase + '）');
+  ok(s2.phase === 'loading', '两只就位后亲代选择完成、等待确认（phase=' + s2.phase + '）');
 }
 
-sec('D. 密封 → 孕育 → 可以结合（真实时间推进，&breed=fast 把孕育压到 0 秒）');
+sec('D. 确认密封 → 孕育 → 模型就绪（真实时间推进，&breed=fast 把孕育压到 0 秒）');
 {
+  await tap('KeyE');
+  await sleep(250);
+  const sealed = await status();
+  ok(['sealing', 'generating', 'ready'].includes(sealed.phase),
+    '按 E 确认后开始密封/孕育（phase=' + sealed.phase + '）');
   const t0 = Date.now();
   let s = await status();
   const seen = [s.phase];
   while (Date.now() - t0 < 20000) {
     s = await status();
     if (seen[seen.length - 1] !== s.phase) seen.push(s.phase);
+    if (s.phase === 'irradiating') {
+      // The production flow keeps radiation confirmation explicit. At the
+      // base rate, two E presses equip the gun and confirm zero radiation.
+      await tap('KeyE');
+      await sleep(120);
+      if ((await status()).phase === 'irradiating') await tap('KeyE');
+    }
     if (s.phase === 'ready' || s.phase === 'playing') break;
     await sleep(120);
   }
   console.log('  相位轨迹：' + seen.join(' → ') + '（' + (Date.now() - t0) + ' ms）');
-  ok(s.phase === 'ready', '孕育结束、可以结合（phase=' + s.phase + '，耗时 ' + (Date.now() - t0) + ' ms）');
+  ok(s.phase === 'ready', '孕育结束、模型就绪（phase=' + s.phase + '，耗时 ' + (Date.now() - t0) + ' ms）');
   ok(!!s.remaining === false || s.remaining === 0, '孕育倒计时已归零（remaining=' + s.remaining + '）');
   ok(await evalJS('!!document.getElementById("breedtag").classList.contains("on")'),
      'HUD 上的「培育舱已就绪」提醒亮了');
@@ -196,50 +266,99 @@ const sample = async () => {
   return s;
 };
 
-sec('E. 开始结合（真按键 E）→ 演出');
+sec('E. 模型就绪后按 E → 新融合舞台');
 {
   await tap('KeyE');
+  // Radiation leaves the gun equipped. One E stows it; the next enters the stage.
+  if((await status()).phase==='ready')await tap('KeyE');
   await sleep(400);
   const s = await sample();
   console.log('  phase=' + s.phase + '  performance.state=' + (s.performance || {}).state);
   ok(s.phase === 'playing', '在舱前按 E ⇒ 进入演出（phase=' + s.phase + '）');
   ok(await evalJS('document.body.classList.contains("pod-cinematic")'), '演出期间加了 pod-cinematic（输入被接管）');
+  ok(s.performance.state==='cinematic'&&s.performance.progress===0&&s.performance.surgeRound===0,
+    '直接进入零进度融合舞台，没有旧 QTE 或强化轮次');
+  if(s.phase!=='playing')await die(1);
+  await screenshot('fusion-chamber-entry.png');
+  ok(await canvasColors()>20,'desktop canvas contains rendered stage and model pixels');
+  await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:false});
+  await sleep(300);
+  await screenshot('fusion-chamber-mobile.png');
+  ok(await canvasColors()>20,'mobile canvas is also nonblank');
+  ok(await evalJS(`(() => {
+    const rect=document.getElementById('fusion-qte').getBoundingClientRect();
+    const header=document.querySelector('#chamber-performance header').getBoundingClientRect();
+    return rect.left>=0&&rect.right<=innerWidth&&rect.bottom<=innerHeight&&rect.top>header.bottom;
+  })()`),'mobile progress controls fit without overlapping the header');
+  await send('Emulation.clearDeviceMetricsOverride');
+  await sleep(200);
 }
 
-sec('F. 按 QTE：扣 10 次空格（这是玩家该做的操作，不是作弊）');
+sec('F. 进度条：按键增加、松手衰减、旋转速度跟随');
 {
-  for (let i = 0; i < 12; i++) { await tap('Space'); await sample(); }
-  const s = await sample();
-  console.log('  presses=' + (s.performance || {}).presses + ' / 10   state=' + (s.performance || {}).state);
-  ok((s.performance || {}).presses >= 10, '空格累计到上限（' + (s.performance || {}).presses + ' / 10）');
+  const start = await sample();
+  const audioBefore=await evalJS('({...window.__probeFusionAudio})');
+  const buttonRect=()=>evalJS(`(() => {
+    const r=document.getElementById('fusion-boost').getBoundingClientRect();
+    return [r.x,r.y,r.width,r.height];
+  })()`);
+  const beforeRect=await buttonRect();
+  for (let i = 0; i < 8; i++) { await tap('Space'); await sample(); }
+  const pressed = await sample();
+  const audioAfter=await evalJS('({...window.__probeFusionAudio})');
+  ok(audioAfter.music>audioBefore.music,'融合专属 BGM 持续产生旋律音符');
+  ok(audioAfter.press-audioBefore.press>=8,'八次空格均触发独立的按键音');
+  console.log('  progress=' + start.performance.progress.toFixed(3) + ' → ' +
+    pressed.performance.progress.toFixed(3) + '  speed=' + pressed.performance.speed.toFixed(1) + '×');
+  ok(pressed.performance.progress > start.performance.progress,
+    '按空格后进度增加');
+  ok(pressed.performance.speed > start.performance.speed,
+    '旋转速度随融合进度增加');
+  const afterRect=await buttonRect();
+  ok(beforeRect.every((v,i)=>Math.abs(v-afterRect[i])<.5),'按键震动不改变按钮的位置或尺寸');
+  await sleep(1200);
+  const decayed = await sample();
+  ok(decayed.performance.progress < pressed.performance.progress,
+    '停止按键后进度持续衰减');
+  await screenshot('fusion-chamber-press.png');
+  let attempts = 0;
+  while ((await status()).performance.progress < 1 && attempts < 100) {
+    await tap('Space');
+    attempts++;
+    await sample();
+  }
+  const full = await sample();
+  console.log('  完成进度=' + full.performance.progress.toFixed(3) + '，按键=' + attempts);
+  ok(full.performance.progress === 1, '持续按键最终达到 100%');
 }
 
 sec('G. 【核心】不给任何干预，看演出能不能自己走到「新生命诞生」');
 {
   const t0 = Date.now();
   let s = await sample();
-  let peakSurge = (s.performance || {}).surgeRound || 0;
   let stallAt = null, lastProgress = Date.now();
   let prevKey = '';
   let everDone = false;
+  let capturedBirth=false;
   while (Date.now() - t0 < BUDGET_MS) {
     s = await sample();
     const p = s.performance || {};
     if (p.done) everDone = true;        // ⚠️ 必须**在循环里**记：舱转入 complete 时会 stop()，
-    peakSurge = Math.max(peakSurge, p.surgeRound || 0);   //    done 立刻被重置回 false（观测竞态）
-    const k = [s.phase, p.state, p.presses, p.surgeRound, p.cinematicPhase, p.done].join('|');
+    if(p.cinematicPhase==='result'&&!capturedBirth) {
+      capturedBirth=true;await screenshot('fusion-chamber-result.png');
+    }
+    const k = [s.phase, p.state, p.progress, p.speed, p.cinematicPhase, p.done].join('|');
     if (k !== prevKey) { prevKey = k; lastProgress = Date.now(); }
     if (!stallAt && Date.now() - lastProgress > 25000) stallAt = { at: Date.now() - t0, ...p, phase: s.phase };
     if (p.done || s.phase === 'complete') break;
     await sleep(250);
   }
   const el = Date.now() - t0;
-  console.log('  演出耗时（从按完 QTE 算起）= ' + (el / 1000).toFixed(1) + ' s｜峰值 surgeRound=' + peakSurge + '/4');
+  console.log('  演出耗时（从进度满算起）= ' + (el / 1000).toFixed(1) + ' s');
   console.log('  轨迹：');
   for (const r of timeline) console.log('    ' + JSON.stringify(r));
   if (stallAt) console.log('  ⚠️ 曾出现 >25 s 无进展：' + JSON.stringify(stallAt));
   ok(!stallAt, '全程没有出现"长时间无进展"（这正是"卡在强化结合 0/4"的对照组）');
-  ok(peakSurge >= 1, '强化阶段真的推进过（峰值 ' + peakSurge + ' / 4）—— 不是停在 0');
   /* ⚠️ 不能在这一刻直接读 performance.done —— 舱一旦转入 complete 就会调 stop()，
      把 performance 会话 reset（done 变回 false、time 归零），所以那是**观测竞态**：
      第一版就是这么假红的。真正可信的判据是 everDone（循环里记到过）
@@ -250,12 +369,15 @@ sec('G. 【核心】不给任何干预，看演出能不能自己走到「新生
   {
     const seen = [...new Set(cineSeen)].filter(Boolean);
     console.log('  演出走过的阶段：' + (seen.join(' → ') || '(无)'));
-    ok(seen.length >= 5, '演出阶段在推进（看到 ' + seen.length + ' 个阶段）');
+    ok(seen.includes('sphere'), '高进度进入失控融合阶段');
+    ok(!seen.includes('drawing')&&!seen.includes('separating'), '没有旧长条拉伸或 DNA 分离阶段');
     /* 出生与结果是这部电影的最后两站；看到它们 = 整场真的播完了。 */
     ok(seen.includes('birth'), '演出播到过「新生(birth)」阶段');
     ok(seen.includes('result'), '演出播到过「结合完成(result)」阶段 —— 整场跑完');
   }
   ok((await status()).phase === 'complete', '舱进入 complete（新生命诞生）');
+  ok(await evalJS('window.__probeBirthPlays')===1,'实际浏览器播放原版 birth-mama 音效一次');
+  await screenshot('fusion-chamber-born.png');
 }
 
 sec('H. 领取后代（真按键 E）→ 舱回到 waiting');
@@ -276,7 +398,13 @@ sec('I. 控制台');
 {
   const errs = events.filter(e => e.method === 'Log.entryAdded' && e.params.entry.level === 'error');
   if (errs.length) for (const e of errs.slice(0, 8)) console.log('  ' + String(e.params.entry.text).slice(0, 220));
-  ok(errs.length === 0, '整场演出没有控制台 error（' + errs.length + ' 条）');
+  const exceptions=events.filter(e=>e.method==='Runtime.exceptionThrown');
+  ok(errs.length === 0&&exceptions.length===0,
+    '整场演出没有控制台或运行时异常（' + (errs.length+exceptions.length) + ' 条）');
+  if(URL_.startsWith('file:')) {
+    ok(!events.some(e=>e.method==='Network.requestWillBeSent'&&e.params.request.url.includes('/api/tripo/')),
+      '离线验收没有请求付费模型生成接口');
+  }
 }
 
 console.log('\n===== ' + (fail === 0 ? '全部通过' : fail + ' 项失败') + '（' + (pass + fail) + ' 项断言：' + pass + ' 通过 / ' + fail + ' 失败）=====');
