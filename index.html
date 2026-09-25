@@ -626,9 +626,31 @@
     <button id="chamber-fire" title="向瞄准的槽位投放（G）">投放</button>
     <button id="chamber-suck" title="吸回亲代或收下后代（F）">吸回</button>
     <button id="chamber-interact" title="在舱前交互（E）">开始结合</button>
+    <button id="chamber-photos" title="上传两张融合参考图">创意融合</button>
   </div>
 </section>
 
+<div id="photo-dialog" role="dialog" aria-modal="true" aria-labelledby="photo-title" hidden>
+  <section class="photo-window">
+    <header><h2 id="photo-title">创意融合</h2><button id="photo-close" aria-label="关闭" title="关闭">×</button></header>
+    <div class="photo-fields">
+      <label class="photo-field" for="photo-front"><span>图片 A · 人物参考</span>
+        <span class="photo-preview"><img id="photo-front-preview" alt="图片 A 预览" hidden></span>
+        <input id="photo-front" type="file" accept="image/png,image/jpeg,image/webp">
+        <span id="photo-front-name" class="photo-filename"></span>
+      </label>
+      <div class="photo-field">
+        <label for="photo-side">图片 B · 姿势与造型</label>
+        <span class="photo-preview"><img id="photo-side-preview" alt="图片 B 预览" hidden></span>
+        <input id="photo-side" type="file" accept="image/png,image/jpeg,image/webp">
+        <span id="photo-side-name" class="photo-filename"></span>
+      </div>
+    </div>
+    <p class="photo-consent">提交后会将两张图片发送至 Tripo，图像生成与 3D 建模分别消耗账户积分。</p>
+    <p id="photo-error" role="alert"></p>
+    <footer><button id="photo-cancel">取消</button><button id="photo-submit" disabled>上传并生成 3D 生物</button></footer>
+  </section>
+</div>
 <!-- 背包仅用于收纳；结合在地图上的太空舱内进行。 -->
 <div id="bag">
   <div class="card" id="bagCard">
@@ -754,6 +776,7 @@ const {createWaterGun} = await import('./water-gun.mjs');
 const {BASE_MUTATION_RATE,normalizedRadiation,createInheritancePlan,resolveInheritancePlan} = await import('./mutation-rate.mjs');
 const {createBonePhysics} = await import('./bone-physics.mjs');
 const {createTripoClient, cloneOffspring, disposeModel} = await import('./tripo-runtime.mjs');
+const {createPhotoInput} = await import('./photo-input.mjs');
 
 /* ============================================================
    0. 世界参数
@@ -766,6 +789,7 @@ const HALF     = WORLD / 2;    // 半幅；⚠️ 2026-09-23 起**当前没有�
                                // 谁要清理它，知道自己在删什么就行 —— 不是漏删。
 const SEED     = 20260922;
 let chamberSystem = null;
+let photoInput = null;
 let waterGun = null, collectorRig = null;
 const EYE      = 1.68;
 const ARENA    = 100;          // 可行走正方形半边长（米）：200×200 的场地，四周是空气墙
@@ -3570,6 +3594,7 @@ document.addEventListener('mousemove', e => {
 
 let lastSpaceAt = -1e9;        // 上一次空格 keydown 的时刻（双击判定）
 addEventListener('keydown', e => {
+  if (photoInput?.open) return;
   if (e.code === 'AltLeft' || e.code === 'AltRight') {
     if (!started || paused || bag.open || chamberSystem?.cinematic) return;
     e.preventDefault();
@@ -4548,6 +4573,20 @@ function confirmMateRadiation(p,value=breeding.pairs[p]?.radiation) {
   return true;
 }
 
+function startPhotoGeneration(p,images) {
+  const pr=breeding.pairs[p];
+  if (!tripoClient.required || pr.state!=='idle' || breeding.slots.slice(p*2,p*2+2).some(Boolean)) return false;
+  // Photos define appearance; this neutral genome only enables later gameplay/breeding.
+  pr.genome=new Array(GENE_COUNT).fill(0);
+  pr.mutations=[];pr.mutationRate=0;pr.radiation=0;pr.genesLocked=true;
+  pr.prompt='人脸辨识优先、夸张姿势、简化服装的Q版创意融合生物';
+  pr.state='running';pr.ms=0;
+  pr.generation={id:crypto.randomUUID(),mode:'creative_fusion',images:{...images},
+    genome:pr.genome.slice(),prompt:pr.prompt,status:'uploading',progress:0};
+  void generateOffspringModel(pr);
+  return true;
+}
+
 function offspringProgress(pr) {
   if(pr.state==='irradiating')return {percent:0,stage:'irradiating',offline:!tripoClient.required};
   if(!tripoClient.required) {
@@ -4557,7 +4596,7 @@ function offspringProgress(pr) {
   }
   const job=pr.generation;
   const percent=pr.model?100:Math.max(0,Math.min(100,Number(job?.progress)||0));
-  const stage=pr.model?'ready':job?.status==='success'?'loading':job?.status||'idle';
+  const stage=pr.model?'ready':job?.status==='success'?'loading':job?.stage||job?.status||'idle';
   return {percent,stage,offline:false};
 }
 
@@ -4567,7 +4606,8 @@ async function generateOffspringModel(pr, resume=false) {
   if (!job || job.busy) return;
   job.busy = true; job.error = ''; job.status = 'submitting';
   try {
-    const result = await tripoClient.generate(job, BODY_BOX[BODY_GRADES[job.genome[G_BODY]]], status => {
+    const box={...BODY_BOX[BODY_GRADES[job.genome[G_BODY]]],preserveAspect:['multiview','head_swap','creative_fusion'].includes(job.mode)};
+    const result = await tripoClient.generate(job, box, status => {
       if (pr.generation === job) Object.assign(job, status);
     }, resume);
     if (pr.generation !== job) { disposeModel(result.model, true); return; }
@@ -4628,7 +4668,8 @@ function birthOffspring(p, destination = 'bag') {
   /* 速度：基因表里**没有**行动类基因 ⇒ 没有依据从基因推。
      取两个亲本物种速度的平均（"从亲本继承"），这是我的判断；表里加了行动基因就换掉。 */
   const speed = (((pa && pa.species.speed) || 0.6) + ((pb && pb.species.speed) || 0.6)) / 2;
-  const form = GENE_DEFS[G_BODYFORM].opts[pr.genome[G_BODYFORM]];
+  const fromPhotos=['multiview','head_swap','creative_fusion'].includes(pr.generation?.mode);
+  const form = fromPhotos?'照片生物':GENE_DEFS[G_BODYFORM].opts[pr.genome[G_BODYFORM]];
   const g = offspringPreview(pr);
   if (!g) return null;
   const sp = { key: pr.modelInfo ? 'offspring-' + pr.modelInfo.taskId : 'offspring', name: form, count: 1, speed, spawn: false, offspring: true };
@@ -4644,7 +4685,8 @@ function birthOffspring(p, destination = 'bag') {
   ent.modelTaskId = pr.modelInfo?.taskId || null;
   ent.modelUrl = pr.modelInfo?.modelUrl || null;
   ent.generationPrompt = pr.prompt;
-  ent.parentSpecies = [pa.species.key, pb.species.key];
+  ent.parentSpecies = [pa?.species.key, pb?.species.key].filter(Boolean);
+  ent.generationSource = pr.generation?.mode || 'text';
   /* 直接进背包：和 captureAnimal 的"在背包里"语义一致（captured + 不可见），
      这样弹夹/背包/屠宰/拖放**全都不用改**就能认它。 */
   ent.captured = true;
@@ -4933,8 +4975,8 @@ chamberSystem = createChamberSystem({
       document.body.classList.remove('water-equipped');
     },
     loadedName: () => mag[0]?.species.name || '',
-    active: () => started && !paused && !bag.open && !chamberSystem?.cinematic,
-    running: () => started && !paused && !bag.open && !debugStill,
+    active: () => started && !paused && !bag.open && !chamberSystem?.cinematic && !photoInput?.open,
+    running: () => started && !paused && !bag.open && !debugStill && !photoInput?.open,
     visible: () => started && !bag.open && hudEl.style.display !== 'none',
     deposit(slot) {
       const index=p*2+slot;
@@ -4961,6 +5003,9 @@ chamberSystem = createChamberSystem({
       return true;
     },
     start: () => startMate(p),
+    photosAvailable: () => tripoClient.required,
+    openPhotos: () => photoInput?.show(p),
+    startPhotos: images => startPhotoGeneration(p,images),
     setRadiation: value => updateMateRadiation(p,value),
     confirmRadiation: value => confirmMateRadiation(p,value),
     stopRadiation: () => waterGun?.stop(),
@@ -4988,6 +5033,17 @@ chamberSystem = createChamberSystem({
       else if (!dragLook && lockEverWorked) requestLock();
     },
   }),
+});
+photoInput=createPhotoInput({
+  onSubmit:(id,images)=>chamberSystem.startPhotos(id,images),
+  onOpen:()=>{
+    cursorReleased=true;vacMouse=false;dragging=false;
+    for(const key in keys)keys[key]=false;
+    waterGun?.stop();
+    if(locked)document.exitPointerLock();
+  },
+  onClose:()=>{breedClockLast=-1;},
+  notice:text=>showToast(text,'GENESIS'),
 });
 waterGun = createWaterGun({
   THREE,scene,camera,collector:collectorRig,
@@ -5034,7 +5090,7 @@ function loop() {
      为什么把 tAcc 也冻住：只冻玩家不冻时钟的话，暂停 10 秒再回来，
      动物的相位会整体前跳 10 秒（它们的运动是 tAcc 的函数），
      看过去像"世界偷偷跑了一段"。要停就停干净。 */
-  const simRunning = !paused && !bag.open && !debugStill && !chamberSystem?.cinematic;
+  const simRunning = !paused && !bag.open && !debugStill && !chamberSystem?.cinematic && !photoInput?.open;
   if (simRunning) tAcc += dt;
 
   const active = started && simRunning;

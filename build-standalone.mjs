@@ -31,7 +31,7 @@ const flightB64 = fs.readFileSync(path.join(HERE, 'assets', 'jetpack-flight.wav'
 // Dependency order is checked below, including the shared Three.js module.
 const chamberFiles = [
   'vendor/cannon-es.mjs', 'bone-physics.mjs',
-  'vendor/meshopt_decoder.module.js', 'tripo-runtime.mjs',
+  'vendor/meshopt_decoder.module.js', 'tripo-runtime.mjs', 'photo-input.mjs',
   'chamber-water.mjs', 'water-gun.mjs', 'mutation-rate.mjs',
   'fusion-v1/wave-motion.mjs', 'fusion-v1/recombination-motion.mjs',
   'fusion-v1/combine-session.mjs', 'fusion-v1/jelly-deform.mjs',
@@ -176,7 +176,9 @@ const SWAPS = [[BOOT, BOOT_STANDALONE], [BOOT_GLTF, BOOT_GLTF_STANDALONE], [BOOT
   ["const {createBonePhysics} = await import('./bone-physics.mjs');",
    "const {createBonePhysics} = await import(__chamberUrls.get('bone-physics.mjs'));"],
   ["const {createTripoClient, cloneOffspring, disposeModel} = await import('./tripo-runtime.mjs');",
-   "const {createTripoClient, cloneOffspring, disposeModel} = await import(__chamberUrls.get('tripo-runtime.mjs'));"]];
+   "const {createTripoClient, cloneOffspring, disposeModel} = await import(__chamberUrls.get('tripo-runtime.mjs'));"],
+  ["const {createPhotoInput} = await import('./photo-input.mjs');",
+   "const {createPhotoInput} = await import(__chamberUrls.get('photo-input.mjs'));"]];
 for (const [a, b] of SWAPS) {
   let done = false;
   for (const [aa, bb] of [[a, b], [a.replace(/\n/g, '\r\n'), b.replace(/\n/g, '\r\n')]]) {

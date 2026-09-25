@@ -36,6 +36,7 @@ import {createWaterGun} from '../water-gun.mjs';
 import {BASE_MUTATION_RATE,normalizedRadiation,createInheritancePlan,resolveInheritancePlan} from '../mutation-rate.mjs';
 import {createBonePhysics} from '../bone-physics.mjs';
 import {createTripoClient, cloneOffspring, disposeModel} from '../tripo-runtime.mjs';
+import {createPhotoInput} from '../photo-input.mjs';
 
 /* ---------- 事件注册表：__L[elemId][type] = [fn, ...] ---------- */
 const __L = Object.create(null);

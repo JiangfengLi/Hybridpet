@@ -53,6 +53,28 @@ for (const [status, confirmed, expectedRetries] of [
 }
 console.log('ok   explicit retry of rejected requests; unknown submissions require confirmation');
 
+for (const confirmed of [false,true]) {
+  let retries=0,prompts=0;
+  const client=createTripoClient({required:true,
+    confirmUnsubmitted:()=>{prompts++;return confirmed;},
+    fetcher:async(path,options)=>{
+      if(path.endsWith('/config'))return {ok:true,json:async()=>({configured:true,token:'test'})};
+      if(path.endsWith('/resume')) {
+        retries++;
+        assert.equal(JSON.parse(options.body).confirm_unsubmitted,true);
+        return {ok:true,json:async()=>({status:'failed',error:'retry reached server'})};
+      }
+      return {ok:true,json:async()=>({status:'unconfirmed',task_id:'known-image-task',
+        image_task_id:'known-image-task',stage:'model_submitting',can_retry:true,error:'unknown model task'})};
+    },
+  });
+  await assert.rejects(()=>client.generate({id:'fusion',mode:'creative_fusion',images:{a:'a',b:'b'},
+    genome:[],prompt:'fusion'}, {},()=>{},true),confirmed?/retry reached server/:/unknown model task/);
+  assert.equal(prompts,1);
+  assert.equal(retries,confirmed?1:0);
+}
+console.log('ok   a known image task never bypasses confirmation for an unknown model task');
+
 await runGame(`
 ${DRIVER_HEAD}
 tripoClient.required=true;

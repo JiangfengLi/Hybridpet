@@ -17,7 +17,7 @@ for(const dir of ['.','test','fusion-v1']) {
 // Harness temp paths are process-local; suites must run serially.
 for(const file of ['test/check-driver-backticks.mjs','test/audio.mjs','test/fusion.mjs','test/mutation-rate.mjs','test/asset-guide.mjs','test/integration.mjs','test/cursor.mjs','test/input.mjs',
   'test/boot-params.mjs','test/chamber.mjs','test/chambers.mjs','test/water.mjs','test/bone-physics.mjs','test/heart-gun.mjs','test/tripo.mjs','test/scene-cost.mjs','test/animal-facing.mjs','test/animal-aim.mjs',
-  'build-standalone.mjs','test/standalone.mjs']) {
+  'test/photo-generation.mjs','build-standalone.mjs','test/standalone.mjs']) {
   console.log('\n### '+file);
   run([file]);
 }

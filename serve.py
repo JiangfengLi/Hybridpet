@@ -73,13 +73,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if not self.local_request() or self.headers.get('X-Tripo-Token') != self.server.api_token:
             return self.json_response({'error': '请求来源无效，请刷新游戏'}, 403)
         try:
+            path = urlsplit(self.path).path
             size = int(self.headers.get('Content-Length', '0'))
-            if not 0 < size <= 12000:
+            limit = 28 * 1024 * 1024 if path == '/api/tripo/jobs' else 12000
+            if not 0 < size <= limit:
                 return self.json_response({'error': '请求大小无效'}, 400)
             data = json.loads(self.rfile.read(size))
             if not isinstance(data, dict):
                 raise ValueError('请求格式无效')
-            path = urlsplit(self.path).path
             if path == '/api/tripo/jobs':
                 return self.json_response(self.server.jobs.create(data), 202)
             if path.startswith('/api/tripo/jobs/') and path.endswith('/resume'):

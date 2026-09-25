@@ -21,7 +21,7 @@ for(const key of ['knife-shiba','kangaroo-peek','bull-aloof','baby-laugh','sunny
   assert.ok(models[key],key+' available offline');
 }
 const available=new Set(['vendor/three.module.min.js']);
-assert.equal(entries.length,21);
+assert.equal(entries.length,22);
 for(const {name,source,dependencies} of entries) {
   assert.equal(source,fs.readFileSync(path.join(root,name),'utf8'),name+' embedded source');
   for(const [specifier,target] of Object.entries(dependencies)) {
@@ -31,6 +31,12 @@ for(const {name,source,dependencies} of entries) {
   available.add(name);
 }
 assert.ok(available.has('chamber-system.mjs'));
+assert.ok(available.has('photo-input.mjs'));
+assert.ok(html.includes('图片 A · 人物参考'));
+assert.ok(html.includes('图片 B · 姿势与造型'));
+assert.ok(html.includes("mode:'creative_fusion'"));
+assert.ok(!html.includes('正面和侧面照片'));
+assert.ok(!html.includes("await import('./photo-input.mjs')"));
 assert.ok(!html.includes("await import('./chamber-system.mjs')"));
 assert.ok(!html.includes("await import('./water-gun.mjs')"));
 assert.ok(available.has('mutation-rate.mjs'));
@@ -57,4 +63,4 @@ assert.ok(html.includes('const BREED_PAIRS = CHAMBER_POSITIONS.length;'));
 const {CHAMBER_POSITIONS}=await import('../chamber-view.mjs');
 assert.equal(CHAMBER_POSITIONS.length,3);
 assert.equal(new Set(CHAMBER_POSITIONS.map(({x,z})=>x+','+z)).size,3);
-console.log('ok   standalone: 21 modules, inline physics/audio, independent radiation genetics, no old UI');
+console.log('ok   standalone: 22 modules, inline physics/audio, creative-fusion photo flow, no old UI');

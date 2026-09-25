@@ -55,3 +55,26 @@
   #chamber-performance header strong{font-size:18px}
 }
 @media(prefers-reduced-motion:reduce){.pod-cinematic #app{animation:none}}
+#chamber-photos{grid-column:1/-1;background:#e6edf8!important;color:#365a80!important}
+#chamber-photos[hidden],#photo-dialog[hidden],.photo-preview img[hidden]{display:none}
+#photo-dialog{position:fixed;inset:0;z-index:60;display:grid;grid-template-columns:minmax(0,1fr);place-items:center;padding:16px;background:#152a3680;box-sizing:border-box;color:#29454c;font:14px/1.5 "Segoe UI","Microsoft YaHei",sans-serif;letter-spacing:0}
+.photo-window{box-sizing:border-box;width:min(560px,100%);min-width:0;max-height:calc(100dvh - 32px);overflow:auto;padding:20px;background:#f7fafb;border:1px solid #a7bbc5;border-radius:8px;box-shadow:0 12px 40px #13283040}
+.photo-window header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+.photo-window h2{margin:0;font-size:17px;font-weight:600;overflow-wrap:anywhere}
+.photo-window button,.photo-window select{min-height:38px;padding:7px 12px;border:1px solid #a7bbc5;border-radius:5px;background:white;color:#29454c;font:inherit;letter-spacing:0;cursor:pointer}
+.photo-window button:focus-visible,.photo-window input:focus-visible,.photo-window select:focus-visible{outline:2px solid #477ca2;outline-offset:2px}
+#photo-close{width:38px;height:38px;flex:none;padding:0;font-size:22px}
+.photo-fields{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.photo-field{display:flex;flex-direction:column;min-width:0;gap:8px}
+.photo-preview{display:grid;place-items:center;aspect-ratio:4/3;width:100%;overflow:hidden;border:1px dashed #a8bdc7;background:#e8eef2;box-sizing:border-box;border-radius:4px}
+.photo-preview img{width:100%;height:100%;min-height:0;object-fit:contain}
+.photo-field input{width:100%;min-width:0;font:12px "Segoe UI","Microsoft YaHei",sans-serif}
+.photo-field input::file-selector-button{padding:6px 8px;border:1px solid #a7bbc5;border-radius:4px;background:white;color:#29454c;cursor:pointer}
+.photo-filename{min-height:18px;font-size:11px;color:#5c737d;overflow-wrap:anywhere}
+.photo-field select{width:100%;font-size:12px}
+.photo-consent{font-size:12px;margin:18px 0 0;color:#6b6578}
+#photo-error{min-height:20px;margin:8px 0;color:#af3450;font-size:12px}
+.photo-window footer{display:flex;justify-content:flex-end;gap:10px}
+#photo-submit{background:#397565;border-color:#397565;color:white}
+#photo-submit:disabled{opacity:.4;cursor:default}
+@media(max-width:480px){.photo-window{padding:16px}.photo-fields{gap:10px}.photo-window h2{font-size:15px}.photo-window footer button{font-size:12px;padding:8px}.photo-field input{font-size:10px}}

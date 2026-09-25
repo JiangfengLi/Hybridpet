@@ -80,6 +80,16 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
     void incubationAudio.activate();
     task++;water.reset();phase='sealing';sealing=0;notice='';return true;
   }
+  function startPhotos(images) {
+    if(!host.active()||distance()>10||player.y>=6||phase!=='loading'||host.parents().some(Boolean))return false;
+    if(!host.startPhotos?.(images))return false;
+    task++;water.reset();phase='generating';notice='';return true;
+  }
+  function openPhotos() {
+    if(!host.active()||distance()>10||player.y>=6||phase!=='loading'||host.parents().some(Boolean))return false;
+    if(!host.photosAvailable?.()){note('创意融合需要本地 Tripo 服务');return false;}
+    host.openPhotos?.();return true;
+  }
   function fire() {
     if(!host.active()||host.waterEquipped?.()||distance()>11)return false;
     const slot=view.aim(player);
@@ -137,7 +147,8 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
     if(phase==='loading') {
       if(host.parents().every(Boolean)) {
         if(!startJob())note('等待两只亲代');
-      } else note('等待两只亲代');
+      } else if(!host.parents().some(Boolean)&&host.photosAvailable?.())openPhotos();
+      else note('等待两只亲代');
       return true;
     }
     if(phase==='ready') {
@@ -167,7 +178,12 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
     }
     if(phase==='irradiating'&&water.status().value>=1)confirmRadiation();
     if(phase==='irradiating'&&host.job().state==='running')phase='generating';
-    if(phase==='generating'&&host.job().state==='ready')phase='ready';
+    if(phase==='generating'&&host.job().state==='ready') {
+      if(['multiview','head_swap','creative_fusion'].includes(host.generation?.()?.mode)) {
+        const baby=host.finish();
+        if(baby){child=baby;view.setChild(cloneVisual(baby));phase='complete';host.sound('finish');}
+      } else phase='ready';
+    }
     const generation=host.generation?.();
     if(['sealing','generating'].includes(phase)&&generation?.status==='error')phase='error';
     if(phase==='playing') {
@@ -201,8 +217,10 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
     const aimed=view.aim(player),parents=host.parents();
     const canEquip=['sealing','irradiating'].includes(phase)&&distance()<10&&player.y<6&&!equipped;
     const canStow=equipped&&host.canStowWater?.();
+    const canPhotos=phase==='loading'&&!parents.some(Boolean)&&host.photosAvailable?.();
+    const photosNear=distance()<=10&&player.y<6;
     const state=JSON.stringify([phase,parents.map(p=>p?.species.name),host.loadedName(),aimed,progress,
-      notice,child?.species.name,generation?.error,generation?.submission_status,equipped,canEquip,canStow,mutation]);
+      notice,child?.species.name,generation?.error,generation?.submission_status,equipped,canEquip,canStow,mutation,canPhotos,photosNear]);
     if(state!==lastHud) {
       lastHud=state;hud.dataset.phase=phase;
       hud.dataset.chamber=String(id);
@@ -215,8 +233,13 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
       $('chamber-left').classList.toggle('aimed',aimed===0);
       $('chamber-right').classList.toggle('aimed',aimed===1);
       $('chamber-loaded').textContent=equipped?'爱心辐射枪':host.loadedName()||'弹夹为空';
-      const modelStatus=progress.offline?'离线演示':({submitting:'提交中',queued:'排队中',running:'模型生成',
-        downloading:'模型下载中',loading:'模型载入中',ready:'模型已就绪',error:'生成中断'})[progress.stage]||'模型生成';
+      const modelStatus=progress.offline?'离线演示':({
+        uploading:'照片上传中',reference_uploading:'参考图上传中',model_reference_uploading:'合成图上传中',
+        submitting:'提交中',composite_submitting:'融合任务提交中',compositing:'融合图生成中',composite_downloading:'融合图下载中',
+        model_submitting:'3D 任务提交中',model:'3D 模型生成中',queued:'排队中',running:'模型生成',
+        downloading:'模型下载中',model_downloading:'3D 模型下载中',loading:'模型载入中',
+        ready:'模型已就绪',error:'生成中断'
+      })[progress.stage]||'模型生成';
       $('chamber-countdown').textContent=phase==='error'?generation?.error||'模型生成中断':
         phase==='loading'&&parentsReady?'亲代已就位 · 按 E 确认结合':
         phase==='irradiating'?'等待确认生成':
@@ -231,9 +254,12 @@ function createPod({THREE,scene,camera,player,host,id,position,performanceView,s
       $('chamber-interact').textContent=phase==='irradiating'?'确认生成':canStow?'收起爱心辐射枪 · E':canEquip?'领取爱心辐射枪 · E':phase==='error'?(generation?.submission_status==='rejected'?'重试提交':generation?.submission_status==='unconfirmed'?'核对后重试':'继续查询 / 加载'):
         phase==='complete'?'收下后代':phase==='loading'&&parentsReady?'确认结合':phase==='loading'?'再次孕育':
         phase==='sealing'?'舱门密封中':phase==='generating'?'模型生成中':'开始结合';
+      const photos=$('chamber-photos');
+      photos.hidden=!canPhotos;
+      photos.disabled=!photosNear;
     }
   }
-  return {id,position,fire,suck,interact,cancel,tick,collect,syncAudio,renderHud,confirmRadiation,
+  return {id,position,fire,suck,interact,cancel,tick,collect,syncAudio,renderHud,confirmRadiation,startPhotos,openPhotos,
     get canConfirm(){return phase==='irradiating'&&distance()<10&&player.y<6;},
     get cinematic(){return phase==='playing';},
     get presentationPaused(){return phase==='playing'&&performanceView.paused;},
@@ -337,9 +363,11 @@ export function createChamberSystem({THREE,scene,camera,player,host,waterThresho
     performanceView.syncAudio(hosts[owner].running()&&!document.hidden);
   }
   const bindings=[['chamber-fire',fire],['chamber-suck',()=>focused()?.suck()??false],
+    ['chamber-photos',()=>focused()?.openPhotos()??false],
     ['chamber-interact',()=>{const pod=focused();return pod?.canConfirm?pod.confirmRadiation():interact();}]];
   bindings.forEach(([id,handler])=>document.getElementById(id).addEventListener('click',handler));
   return {fire,suck,interact,syncAudio,
+    startPhotos(id,images){return pods[id]?.startPhotos(images)??false;},
     confirmRadiation(){const pod=radiationPod();return pod?.canConfirm?pod.confirmRadiation():false;},
     get canConfirmRadiation(){return radiationPod()?.canConfirm??false;},
     get cinematic(){return cinematic();},

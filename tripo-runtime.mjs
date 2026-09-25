@@ -26,7 +26,8 @@ export function normalizeOffspring(THREE, source, box) {
   if (triangles > 3000) { disposeModel(root); throw new Error('模型超过 3000 三角面上限'); }
   for (const mesh of meshes) {
     mesh.geometry.translate(-center.x, -bounds.min.y, -center.z);
-    mesh.geometry.scale(box.x/size.x, box.y/size.y, box.z/size.z);
+    const fit=Math.min(box.x/size.x,box.y/size.y,box.z/size.z);
+    mesh.geometry.scale(...(box.preserveAspect?[fit,fit,fit]:[box.x/size.x,box.y/size.y,box.z/size.z]));
     mesh.geometry.computeBoundingBox(); mesh.geometry.computeBoundingSphere();
   }
   root.userData = {kind:'land', gait:'squash', body, speed:1, triangles};
@@ -85,13 +86,14 @@ export function createTripoClient({THREE, GLTFLoader, fetcher=(...args)=>fetch(.
   }
   async function generate(job, box, onProgress=()=>{}, resume=false) {
     // Reposting a local ID is idempotent: the server never repeats a Tripo POST.
-    let result = await request('/api/tripo/jobs', {id:job.id, genome:job.genome, prompt:job.prompt});
+    let result = await request('/api/tripo/jobs', {id:job.id, genome:job.genome, prompt:job.prompt,
+      ...(['multiview','head_swap','creative_fusion'].includes(job.mode)?{mode:job.mode,images:job.images}:{})});
     if (resume) {
       let confirmation = false;
-      if (result.status === 'unconfirmed' && !result.task_id) {
+      if (result.status === 'unconfirmed') {
         confirmation = await confirmUnsubmitted('上次提交结果未知。请先到 Tripo 控制台核对本次任务。\n\n只有确认没有创建任务时，才点击“确定”重新提交；否则点击“取消”，避免重复生成和扣费。\n\n是否已核对并确认没有创建任务？');
       }
-      if (result.can_resume || result.can_retry || confirmation) {
+      if (result.status === 'unconfirmed' ? confirmation : result.can_resume || result.can_retry) {
         result = await request('/api/tripo/jobs/'+job.id+'/resume', {confirm_unsubmitted:confirmation});
       }
     }
@@ -103,7 +105,7 @@ export function createTripoClient({THREE, GLTFLoader, fetcher=(...args)=>fetch(.
         const model = await load(result.model_url, box);
         return {model, taskId:result.task_id, modelUrl:result.model_url, triangles:result.triangles};
       }
-      if (!['submitting','queued','running','downloading'].includes(result.status)) {
+      if (!['uploading','submitting','queued','running','downloading'].includes(result.status)) {
         throw new Error(result.error || '模型生成未完成，本次基因已保留');
       }
       if (Date.now() > deadline) throw new Error('生成耗时较长，可继续查询本次任务');

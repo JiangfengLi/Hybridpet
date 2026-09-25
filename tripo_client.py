@@ -179,16 +179,20 @@ class Client:
                             content_type="multipart/form-data; boundary=" + boundary)
         token = data.get("image_token")
         if not isinstance(token, str) or not token:
-            raise TripoError("Upload response is missing image_token.")
+            raise TripoError("Upload response is missing image_token.", reason="invalid_response")
         return {"type": kind, "file_token": token}
 
 
 def read_image(path):
     path = Path(path)
     size = path.stat().st_size
-    if not 0 < size <= 20 * 1024 * 1024:
-        raise TripoError("Reference image must be non-empty and no larger than 20 MB.")
+    if not 0 < size <= 10 * 1024 * 1024:
+        raise TripoError("Reference image must be non-empty and no larger than 10 MB.")
     content = path.read_bytes()
+    return image_kind(content), content
+
+
+def image_kind(content):
     if content.startswith(b"\x89PNG\r\n\x1a\n"):
         kind = "png"
     elif content.startswith(b"\xff\xd8\xff"):
@@ -197,7 +201,7 @@ def read_image(path):
         kind = "webp"
     else:
         raise TripoError("Reference must be a PNG, JPEG or WebP image (checked by file header).")
-    return kind, content
+    return kind
 
 
 def payload_for(args):
